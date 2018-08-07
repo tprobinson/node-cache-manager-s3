@@ -112,7 +112,7 @@ class S3Cache {
 
 		// Perform any normalization needed before we checksum
 		if( this.options.normalizeLowercase ) {
-			key = key.toLowercase()
+			key = key.toLowerCase()
 		}
 
 		if( this.options.parseKeyAsUrl ) {
@@ -134,7 +134,9 @@ class S3Cache {
 		// Add a folder structure based on the hash.
 		const urlChunks = []
 		for( let depth = 0; depth < this.options.folderPathDepth; depth++ ) {
-			urlChunks.push(key.slice(depth * this.options.folderPathChunkSize, this.options.folderPathChunkSize))
+			const begin = depth * this.options.folderPathChunkSize
+			const end = begin + this.options.folderPathChunkSize
+			urlChunks.push(key.slice(begin, end))
 		}
 
 		key = urlChunks.join('/') + '/' + key
@@ -176,6 +178,12 @@ class S3Cache {
 			request.send()
 		}
 	}
+	// TODO: implement del function
+	// TODO: implement keys function
+	// TODO: implement ttl function
+	// TODO: implement reset function? clear the whole cache?
+	// TODO: implement setex function: make a copy of the object
+	// CHECK: should I delete an object when I get it and it's too old? Does S3 prune for me?
 }
 
 module.exports = S3Cache

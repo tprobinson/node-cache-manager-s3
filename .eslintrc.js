@@ -1,5 +1,5 @@
 module.exports = {
-    extends: "standard",
+    extends: ["standard", "plugin:jest/recommended"],
     rules: {
       "indent": ["error", "tab"],
       "no-tabs": ["off"],
