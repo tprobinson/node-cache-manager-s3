@@ -24,7 +24,9 @@ class S3 {
 		}
 
 		if( keyMustExist && !(params.Key in this.cache[params.Bucket]) ) {
-			return new Error(`Requested key: ${params.Key} in bucket: ${params.Bucket} does not exist!`)
+			const err = new Error('NoSuchKey: The specified key does not exist.')
+			err.statusCode = 404
+			return err
 		}
 
 		// Check to make sure this path is a sane one.
@@ -55,6 +57,9 @@ class S3 {
 
 	getObject(inputParams = {}, cb) {
 		const params = this._mergeParams(inputParams)
+		if( !cb ) {
+			cb = () => {}
+		}
 
 		if( Object.keys(params).length === 0 ) {
 			this._log('No params provided to getObject, returning')
@@ -70,10 +75,14 @@ class S3 {
 		}
 
 		cb(err, this.cache[params.Bucket][params.Key])
+		return {send: () => {}}
 	}
 
 	putObject(inputParams = {}, cb) {
 		const params = this._mergeParams(inputParams)
+		if( !cb ) {
+			cb = () => {}
+		}
 
 		if( Object.keys(params).length === 0 ) {
 			this._log('No params provided to putObject, returning')
@@ -95,6 +104,73 @@ class S3 {
 
 		this.cache[params.Bucket][params.Key] = params
 		cb(err, null)
+		return {send: () => {}}
+	}
+
+	listObjects(inputParams = {}, cb) {
+		const params = this._mergeParams(inputParams)
+
+		if( Object.keys(params).length === 0 ) {
+			this._log('No params provided to listObjects, returning')
+			cb()
+			return
+		}
+		this._log('listObjects', params)
+
+		let results = []
+		if( params.Bucket in this.cache ) {
+			results = this.cache[params.Bucket]
+		}
+
+		if( 'Prefix' in params ) {
+			cb(null, Object.values(results).filter(x => x.Key.startsWith(params.Prefix)))
+			return
+		}
+
+		cb(null, Object.values(results))
+		return {send: () => {}}
+	}
+
+	deleteObject(inputParams = {}, cb) {
+		const params = this._mergeParams(inputParams)
+		if( !cb ) {
+			cb = () => {}
+		}
+
+		if( Object.keys(params).length === 0 ) {
+			this._log('No params provided to deleteObject, returning')
+			cb()
+			return
+		}
+		this._log('deleteObject', params)
+		const err = this._checkPath(params)
+
+		if( err instanceof Error ) {
+			cb(err, null)
+			return
+		}
+
+		if( params.Key in this.cache[params.Bucket] ) {
+			delete this.cache[params.Bucket][params.Key]
+		}
+
+		cb(err, {})
+		return {send: () => {}}
+	}
+
+	headObject(inputParams = {}, cb) {
+		if( !cb ) {
+			cb = () => {}
+		}
+
+		this.getObject(inputParams, (err, result) => {
+			if( result ) {
+				delete result.body
+			}
+
+			cb(err, result)
+		})
+		return {send: () => {}}
 	}
 
 	resetCache() {
