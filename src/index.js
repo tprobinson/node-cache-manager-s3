@@ -1,16 +1,23 @@
 /** @module S3Cache */
+const async = require('async')
 const path = require('path')
 const url = require('url')
 const querystring = require('querystring')
 const checksum = require('checksum')
 const moment = require('moment')
+
+const log = require('loglevel')
+const prefix = require('loglevel-plugin-prefix')
+const chalk = require('chalk')
+
 const S3 = require('aws-sdk').S3
 
 const defaultOptions = {
-	debug: false,
+	logLevel: 'warn',
 	ttl: 0,
 	ttlUnits: 'seconds',
 	pathPrefix: '',
+	stringifyValues: true,
 
 	// Options for folder chunking
 	folderPathDepth: 2,
@@ -33,6 +40,14 @@ const defaultOptions = {
 
 	// Options for caching
 	proactiveExpiry: false,
+}
+
+const logColors = {
+	TRACE: chalk.magenta,
+	DEBUG: chalk.cyan,
+	INFO: chalk.blue,
+	WARN: chalk.yellow,
+	ERROR: chalk.red,
 }
 
 /**
@@ -143,17 +158,29 @@ class S3Cache {
 		}
 
 		this.s3 = new S3(constructorOptions)
-	}
 
-	/**
-	 * A simple debug logging function. Triggered by {@link constructor.option.debug}
-	 * @private
-	 * @param  {[type]} message - The message to log.
-	 */
-	_log(message) {
-		if( this.options.debug ) {
-			console.log(message)
-		}
+		// Setup logging
+		log.setLevel(this.options.logLevel)
+		prefix.reg(log)
+
+		prefix.apply(log, {
+			format(level, name, timestamp) {
+				return `${chalk.gray(`[${timestamp}]`)} ${logColors[level.toUpperCase()](level)} ${chalk.green(`${name}:`)}`
+			},
+		})
+
+		this._log = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment']
+			.reduce((memo, type) => {
+				// Create the logger
+				Object.assign(memo, {[type]: log.getLogger(type)})
+
+				// Look for an environment variable with this logger's name to set level
+				if( `S3CACHE_${type.toUpperCase()}_LOGLEVEL` in process.env && process.env[`S3CACHE_${type.toUpperCase()}_LOGLEVEL`] ) {
+					memo[type].setLevel(process.env[`S3CACHE_${type.toUpperCase()}_LOGLEVEL`])
+				}
+
+				return memo
+			}, {})
 	}
 
 	/**
@@ -220,7 +247,7 @@ class S3Cache {
 		}
 
 		if( this.options.normalizeLowercase || this.options.parseKeyAsUrl || this.options.parseKeyAsPath ) {
-			this._log(`Path normalized: ${key}`)
+			this._log.normalizePath.debug('Path normalized:', key)
 		}
 
 		// Checksum the path to remove all potentially bad characters
@@ -244,17 +271,42 @@ class S3Cache {
 			key = path.join(this.options.pathPrefix, key)
 		}
 
-		this._log(`Final path: ${key}`)
+		this._log.normalizePath.debug('Final path: ', key)
 		return key
+	}
+
+	_stringifyResponse(response) {
+		if( !response || !('Body' in response) ) {
+			console.log('Unknown response', response)
+			return response
+		}
+
+		return response.Body.toString()
+	}
+
+	_timestampToMoment(timestamp) {
+		this._log.timestampToMoment.trace('Timestamp being converted to moment:', timestamp)
+
+		// Convert a Unix timestamp to milliseconds, because javascript
+		if( typeof timestamp === 'number' ) {
+			return moment(timestamp * 1000)
+		}
+
+		return moment(timestamp)
 	}
 
 	/**
 	 * get a key from the cache.
-	 * @param {...string|Object|function} args                   - Polymorphic argument to support optional parameters
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
 	 */
 	get(...args) {
 		const key = args.shift()
 		let options, cb
+
+		if( log.getLevel() === log.levels.TRACE ) {
+			this._log.get.trace('called at:', moment().valueOf())
+		}
+		this._log.get.debug('called with:', key)
 
 		if( args.length === 2 ) {
 			[options, cb] = args
@@ -269,32 +321,52 @@ class S3Cache {
 		// Allow per-request options to override constructor options.
 		const currentOptions = Object.assign({}, this.options, options)
 
-		this._log(`Getting key: ${key}`)
 		const requestOptions = {
 			Key: this._getPath(key),
 		}
+
+		this._log.get.trace(
+			'options components:',
+			'this.options:', this.options,
+			'options:', options,
+			'requestOptions:', requestOptions,
+		)
 
 		// Allow 's3Options' to override request options.
 		if( options && 's3Options' in options ) {
 			Object.assign(requestOptions, options.s3Options)
 		}
 
-		this.s3.getObject(requestOptions, (err, result) => {
-			if(!cb) {
-				cb = () => {}
-			}
+		if(!cb) {
+			cb = () => {}
+		}
 
-			// Check the expiration. If it's dead, pretend there's nothing.
-			if( !err && 'Expires' in result && moment.unix(result.Expires).isBefore() ) {
-				// If we're being proactive, delete the object.
-				if( currentOptions.proactiveExpiry ) {
-					this._log('Object is expired, deleting it')
-					this.del(key, (err, result) => err ? cb(err, null) : cb(null, null))
+		this._log.get.debug('final options: ', requestOptions)
+
+		async.waterfall([
+			waterCb => this.s3.getObject(requestOptions, waterCb),
+			(result, waterCb) => {
+				// Check the expiration. If it's dead, pretend there's nothing.
+				if( 'Expires' in result && this._timestampToMoment(result.Expires).isBefore() ) {
+					// If we're being proactive, delete the object.
+					if( currentOptions.proactiveExpiry ) {
+						this._log.get.info(key, ' is expired, deleting it')
+						this.del(key, (err, result) => err ? waterCb(err, null) : waterCb(null, null))
+						return
+					} else {
+						this._log.get.info(key, ' is expired, ignoring result')
+					}
+
+					waterCb(null, null)
 					return
-				} else {
-					this._log('Object is expired, ignoring result')
 				}
 
+				this._log.get.trace('get returning result:', result)
+				waterCb(null, this._stringifyResponse(result))
+			}
+		], (err, result) => {
+			if( err instanceof Error && err.statusCode === 404 ) {
+				this._log.get.trace(key, ' not found according to s3' )
 				cb(null, null)
 				return
 			}
@@ -305,12 +377,17 @@ class S3Cache {
 
 	/**
 	 * set a key in the cache. Assumes the bucket already exists.
-	 * @param {...string|Object|function} args                   - Polymorphic argument to support optional parameters
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
 	 */
 	set(...args) {
 		const key = args.shift()
 		const value = args.shift()
 		let options, cb
+
+		if( log.getLevel() === log.levels.TRACE ) {
+			this._log.set.trace('called at:', moment().valueOf(), 'with value: ', value)
+		}
+		this._log.set.debug('called with:', key)
 
 		if( args.length === 2 ) {
 			[options, cb] = args
@@ -325,7 +402,6 @@ class S3Cache {
 		// Allow per-request options to override constructor options.
 		const currentOptions = Object.assign({}, this.options, options)
 
-		this._log(`Setting key: ${key}`)
 		const requestOptions = {
 			Key: this._getPath(key),
 			ACL: currentOptions.acl,
@@ -335,13 +411,22 @@ class S3Cache {
 
 		if( currentOptions.ttl ) {
 			requestOptions.Expires = moment().add(currentOptions.ttl, currentOptions.ttlUnits).unix()
-			this._log('Adding object expires at ' + requestOptions.Expires)
+			this._log.set.debug(key, ' expires at ' + requestOptions.Expires)
 		}
+
+		this._log.set.trace(
+			'options components:',
+			'this.options:', this.options,
+			'options:', options,
+			'requestOptions:', requestOptions,
+		)
 
 		// Allow 's3Options' to override request options.
 		if( options && 's3Options' in options ) {
 			Object.assign(requestOptions, options.s3Options)
 		}
+
+		this._log.set.debug('final options: ', requestOptions)
 
 		const request = this.s3.putObject(requestOptions, cb)
 
@@ -352,11 +437,16 @@ class S3Cache {
 
 	/**
 	 * delete a key in the cache.
-	 * @param {...string|Object|function} args                   - Polymorphic argument to support optional parameters
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
 	 */
 	del(...args) {
 		const key = args.shift()
 		let options, cb
+
+		if( log.getLevel() === log.levels.TRACE ) {
+			this._log.del.trace('called at:', moment().valueOf())
+		}
+		this._log.del.debug('called with:', key)
 
 		if( args.length === 2 ) {
 			[options, cb] = args
@@ -372,16 +462,23 @@ class S3Cache {
 		// uncomment this if I ever use this.options, use this obj instead
 		// const currentOptions = Object.assign({}, this.options, options)
 
-		this._log(`Deleting key: ${key}`)
-
 		const requestOptions = {
 			Key: this._getPath(key),
 		}
+
+		this._log.del.trace(
+			'options components:',
+			'this.options:', this.options,
+			'options:', options,
+			'requestOptions:', requestOptions,
+		)
 
 		// Allow 's3Options' to override request options.
 		if( options && 's3Options' in options ) {
 			Object.assign(requestOptions, options.s3Options)
 		}
+
+		this._log.del.debug('final options: ', requestOptions)
 
 		const request = this.s3.deleteObject(requestOptions, cb)
 
@@ -392,11 +489,16 @@ class S3Cache {
 
 	/**
 	 * Get a list of objects from the cache. This function is sort of pointless because of hashing.
-	 * @param {...string|Object|function} args                   - Polymorphic argument to support optional parameters
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
 	 */
 	keys(...args) {
 		const cb = args.pop()
 		let key, options
+
+		if( log.getLevel() === log.levels.TRACE ) {
+			this._log.keys.trace('called at:', moment().valueOf())
+		}
+		this._log.keys.debug('called with:', key)
 
 		if( args.length === 2 ) {
 			[key, options] = args
@@ -409,10 +511,8 @@ class S3Cache {
 		}
 
 		// Allow per-request options to override constructor options.
-		// uncomment this if I ever use this.options, use this obj instead
-		// const currentOptions = Object.assign({}, this.options, options)
+		const currentOptions = Object.assign({}, this.options, options)
 
-		this._log(`Enumerating keys by pattern: ${key}`)
 		const requestOptions = {}
 
 		// This is pointless since the hashing will never allow this to work.
@@ -425,18 +525,72 @@ class S3Cache {
 			Object.assign(requestOptions, options.s3Options)
 		}
 
-		// TODO: implement longer than 1000 key retrieval
-		this.s3.listObjects(requestOptions, cb)
+		this._log.keys.debug('final options: ', requestOptions)
+
+		// Grab all keys via pagination
+		let ContinuationToken = false
+		// Doing this with an external value because doWhilst seems to treat arrays wrong
+		const finalResults = []
+		async.doWhilst(whilstCb => {
+			const thisLoopOptions = Object.assign({}, requestOptions)
+			if( ContinuationToken ) {
+				this._log.keys.trace('got continuation token: ', ContinuationToken)
+				thisLoopOptions.ContinuationToken = ContinuationToken
+			}
+
+			this.s3.listObjectsV2(thisLoopOptions, (err, results) => {
+				if( err ) {
+					whilstCb(err)
+					return
+				}
+
+				if( results.IsTruncated ) {
+					ContinuationToken = results.NextContinuationToken
+				} else {
+					ContinuationToken = false
+				}
+
+				finalResults.push(results.Contents)
+				whilstCb()
+			})
+		}, () => ContinuationToken !== false, err => {
+			if( err ) {
+				cb(err)
+				return
+			}
+
+			// Secret option for optimizing reset() a little
+			if( currentOptions.dontConcatPages ) {
+				this._log.keys.debug('not concatenating pages')
+				cb(null, finalResults)
+				return
+			}
+
+			if( finalResults.length === 1 ) {
+				this._log.keys.debug('single page result')
+				cb(null, finalResults[0])
+				return
+			}
+
+			// Concatenate all results
+			this._log.keys.debug('concatenating page results')
+			cb(null, finalResults.reduce((memo, arr) => memo.concat(arr), []))
+		})
 	}
 
 	/**
-	 * Get the ttl time of a particular object
-	 * @param {...string|Object|function} args            - Polymorphic argument to support optional parameters
+	 * Get the metadata of a particular object
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
 	 */
-	ttl(...args) {
+	head(...args) {
 		let options
 		const key = args.shift()
 		const cb = args.pop()
+
+		if( log.getLevel() === log.levels.TRACE ) {
+			this._log.keys.trace('called at:', moment().valueOf())
+		}
+		this._log.keys.debug('called with:', key)
 
 		if( args.length === 1 ) {
 			options = args[0]
@@ -445,8 +599,6 @@ class S3Cache {
 		// Allow per-request options to override constructor options.
 		// uncomment this if I ever use this.options, use this obj instead
 		// const currentOptions = Object.assign({}, this.options, options)
-
-		this._log(`Getting TTL on key: ${key}`)
 
 		const requestOptions = {
 			Key: this._getPath(key),
@@ -457,9 +609,21 @@ class S3Cache {
 			Object.assign(requestOptions, options.s3Options)
 		}
 
-		this.s3.headObject(requestOptions, (err, result) => {
+		this._log.keys.debug('final options: ', requestOptions)
+
+		this.s3.headObject(requestOptions, cb)
+	}
+
+	/**
+	 * Get the ttl time of a particular object
+	 * @param {...string|Object|function} args - Polymorphic argument to support optional parameters
+	 */
+	ttl(...args) {
+		const cb = args.pop()
+
+		this.head(...args, (err, result) => {
 			if( !err && 'Expires' in result ) {
-				cb(null, result.Expires)
+				cb(null, this._timestampToMoment(result.Expires).unix())
 				return
 			}
 
@@ -467,7 +631,22 @@ class S3Cache {
 		})
 	}
 
-	// TODO: implement reset function? clear the whole cache?
+	reset(cb) {
+		this._log.reset.warn('Resetting bucket!')
+		async.waterfall([
+			waterCb => this.keys({dontConcatPages: true}, waterCb),
+			(results, waterCb) => async.mapLimit(results, 2, (dataset, mapCb) => {
+				if( dataset.length === 0 ) { mapCb(); return }
+				this.s3.deleteObjects({
+					Delete: {
+						// deleteObjects does not accept any parameters except key and version
+						Objects: dataset.map(({Key, VersionId}) => ({Key, VersionId})),
+					},
+				}, mapCb)
+			}, waterCb)
+		], cb)
+	}
+
 	// TODO: implement setex function? make a copy of the object since S3 is weird
 }
 

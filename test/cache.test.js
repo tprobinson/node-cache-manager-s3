@@ -1,18 +1,12 @@
 const S3Cache = require('../src/index.js')
+const utils = require('./utils')
 const random = require('random-words')
 const moment = require('moment')
+const async = require('async')
 
-const utils = require('./utils')
+const usingRealAws = process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true)
 
-const debug = false
-const debugLog = utils.debugLogFunc(debug)
-
-const keyParams = {
-	accessKey: random(utils.largeRandomOptions),
-	secretKey: random(utils.largeRandomOptions),
-	bucket: random(utils.largeRandomOptions),
-	debug,
-}
+const keyParams = utils.constructorParams
 
 expect.extend({ toBeInRange: utils.toBeInRange })
 
@@ -32,11 +26,13 @@ describe('class construction options', () => {
 	})
 
 	test('can add options to S3 constructor', () => {
+		const headerKey = 'ContentType'
+		const headerValue = 'text/plain'
 		const cache = new S3Cache(Object.assign({}, keyParams, {
-			s3Options: {params: {ServerSideEncryption: 'AES256'}}
+			s3Options: {params: {[headerKey]: headerValue}}
 		}))
 
-		expect(cache).toHaveProperty('s3.config.params.ServerSideEncryption', 'AES256')
+		expect(cache).toHaveProperty(`s3.config.params.${headerKey}`, headerValue)
 	})
 
 	test('construction fails without required parameters', () => {
@@ -54,9 +50,21 @@ describe('basic function test', () => {
 	const cache = new S3Cache(keyParams)
 	const testKey = random()
 	const testValue = random()
+	const largeCountOfKeys = (Math.random() + 1) * 100 + 1000
+	const largeListOfKeys = []
+	for( let i = largeCountOfKeys; i > 0; i-- ) {
+		largeListOfKeys.push({key: random(utils.largeRandomOptions), value: random()})
+	}
+
+	afterAll(done => cache.reset(done))
 
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
+	})
+
+	// Since the previous test doesn't actually manipulate buckets, do it here as a test.
+	test('reset cache', done => {
+		cache.reset(done)
 	})
 
 	test('set string', done => {
@@ -66,31 +74,7 @@ describe('basic function test', () => {
 	test('get string', done => {
 		cache.get(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
-			done()
-		})
-	})
-
-	test('fail to get string with different case', done => {
-		cache.get(utils.randomizeCase(testKey), (err, value) => {
-			expect(err).toEqual(expect.any(Error))
-			expect(value).toBeNull()
-			done()
-		})
-	})
-
-	test('list keys', done => {
-		cache.keys((err, values) => {
-			expect(err).toBeNull()
-			expect(values.length === 1 && values[0].Body === testValue).toBeTruthy()
-			done()
-		})
-	})
-
-	test('list keys with empty prefix', done => {
-		cache.keys('', (err, values) => {
-			expect(err).toBeNull()
-			expect(values.length === 1 && values[0].Body === testValue).toBeTruthy()
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
@@ -103,25 +87,95 @@ describe('basic function test', () => {
 		})
 	})
 
+	test('fail to get string with different case', done => {
+		cache.get(utils.randomizeCase(testKey), (err, value) => {
+			expect(err).toBeNull()
+			expect(value).toBeNull()
+			done()
+		})
+	})
+
+	test('list keys', done => {
+		cache.keys((err, values) => {
+			expect(err).toBeNull()
+			expect(values).toHaveLength(1)
+			done()
+		})
+	})
+
+	test('list keys with empty prefix', done => {
+		cache.keys('', (err, values) => {
+			expect(err).toBeNull()
+			expect(values).toHaveLength(1)
+			done()
+		})
+	})
+
+	const setManyKeys = done => {
+		async.each(largeListOfKeys, (item, cb) => cache.set(item.key, item.value, cb), done)
+	}
+
+	const getManyKeys = done => {
+		cache.keys((err, values) => {
+			expect(err).toBeNull()
+			// + 1 for the keys we've set already
+			expect(values).toHaveLength(largeListOfKeys.length + 1)
+			done()
+		})
+	}
+
+	// Skip these if we're using real AWS, since they're a lot of load.
+	if( usingRealAws ) {
+		test.skip('set more than 1000 keys (skipped for real AWS)', setManyKeys) // eslint-disable-line jest/no-disabled-tests
+		test.skip('list more than 1000 keys (skipped for real AWS)', getManyKeys) // eslint-disable-line jest/no-disabled-tests
+	} else {
+		test('set more than 1000 keys', setManyKeys)
+		test('list more than 1000 keys', getManyKeys)
+	}
+
 	test('delete string', done => {
 		cache.del(testKey, done)
 	})
 
 	test('fail to get deleted string', done => {
 		cache.get(testKey, (err, value) => {
-			expect(err).toEqual(expect.any(Error))
-			expect(err).toHaveProperty('statusCode', 404)
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
 	})
 
-	test('debug logging', done => {
-		const cache = new S3Cache(Object.assign({}, keyParams, {debug: true}))
+	test('error when get/set with key/value as non-string', done => {
+		expect(() => cache.get(1)).toThrow()
+		expect(() => cache.set(1, 2)).toThrow()
+		done()
+	})
+
+	test('debug logging with option', done => {
+		const cache = new S3Cache(Object.assign({}, keyParams, {logLevel: 'TRACE'}))
 		const fakeDebugLog = jest.fn()
 		jest.spyOn(global.console, 'log').mockImplementation(fakeDebugLog)
 		cache.keys(() => {
 			expect(fakeDebugLog).toHaveBeenCalled()
+			done()
+		})
+	})
+
+	test('debug logging with env var', done => {
+		const oldLogLevel = process.env.S3CACHE_KEYS_LOGLEVEL
+		process.env.S3CACHE_KEYS_LOGLEVEL = 'TRACE'
+
+		const cache = new S3Cache(keyParams)
+		const fakeDebugLog = jest.fn()
+		jest.spyOn(global.console, 'log').mockImplementation(fakeDebugLog)
+		cache.keys(() => {
+			expect(fakeDebugLog).toHaveBeenCalled()
+
+			if( oldLogLevel ) {
+				process.env.S3CACHE_GET_LOGLEVEL = oldLogLevel
+			} else {
+				delete process.env.S3CACHE_GET_LOGLEVEL
+			}
 			done()
 		})
 	})
@@ -134,8 +188,10 @@ describe('basic function test without callbacks', () => {
 	const testValue = random()
 	const testValue2 = random()
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set string', () => {
@@ -167,12 +223,14 @@ describe('basic function test with options overrides', () => {
 	const cache = new S3Cache(keyParams)
 	const testKey = random()
 	const testValue = random()
-	const headerName = 'ServerSideEncryption'
-	const headerValue = 'AES256'
+	const headerName = 'ContentType'
+	const headerValue = 'text/plain'
 	const headers = {s3Options: {[headerName]: headerValue}}
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set string', done => {
@@ -180,32 +238,39 @@ describe('basic function test with options overrides', () => {
 	})
 
 	test('get string', done => {
-		cache.get(testKey, headers, (err, value) => {
+		cache.get(testKey, {}, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
-			expect(value).toHaveProperty(headerName, headerValue)
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
 
 	test('list keys', done => {
-		cache.keys(headers, (err, values) => {
+		cache.keys({}, (err, values) => {
 			expect(err).toBeNull()
-			expect(values.length === 1 && values[0].Body === testValue).toBeTruthy()
+			expect(values).toHaveLength(1)
 			done()
 		})
 	})
 
 	test('list keys with prefix', done => {
-		cache.keys('', headers, (err, values) => {
+		cache.keys('', {}, (err, values) => {
 			expect(err).toBeNull()
-			expect(values.length === 1 && values[0].Body === testValue).toBeTruthy()
+			expect(values).toHaveLength(1)
+			done()
+		})
+	})
+
+	test('get key metadata', done => {
+		cache.head(testKey, {s3Options: {IfModifiedSince: 0}}, (err, value) => {
+			expect(err).toBeNull()
+			expect(value).toHaveProperty(headerName, headerValue)
 			done()
 		})
 	})
 
 	test('get key with no TTL', done => {
-		cache.ttl(testKey, headers, (err, value) => {
+		cache.ttl(testKey, {}, (err, value) => {
 			expect(err).toBeNull()
 			expect(value).toEqual(-1)
 			done()
@@ -213,7 +278,7 @@ describe('basic function test with options overrides', () => {
 	})
 
 	test('delete string', done => {
-		cache.del(testKey, headers, done)
+		cache.del(testKey, {}, done)
 	})
 })
 
@@ -227,20 +292,18 @@ describe('get/set/del with prefix', () => {
 	const testValue = random()
 
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
-	test('set string', done => {
-		cache.set(testKey, testValue, done)
-	})
-
-	test('get string', done => {
-		cache.get(testKey, (err, value) => {
-			expect(err).toBeNull()
-			expect(value.Key.startsWith(pathPrefix + '/')).toBeTruthy()
-			expect(value).toHaveProperty('Body', testValue)
-			done()
-		})
+	test('check a set string prefix', done => {
+		async.waterfall([
+			waterCb => cache.set(testKey, testValue, waterCb),
+			(x, waterCb) => cache.get(testKey, {}, (err, value) => {
+				expect(err).toBeNull()
+				expect(value).toEqual(testValue)
+				waterCb()
+			})
+		], done)
 	})
 })
 
@@ -255,8 +318,10 @@ describe('get/set/del with ttl', () => {
 	const testKey = random()
 	const testValue = random()
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set future ttl string', done => {
@@ -264,12 +329,12 @@ describe('get/set/del with ttl', () => {
 	})
 
 	test('get future ttl string', done => {
-		cache.get(testKey, (err, value) => {
+		cache.head(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
+			const stamp = cache._timestampToMoment(value.Expires).unix()
 
 			// Give the timestamp a little cushion in case of lag.
-			expect(value.Expires).toBeInRange(expectedExpireTime, expectedExpireTime + 3)
+			expect(stamp).toBeInRange(expectedExpireTime, expectedExpireTime + 30)
 			done()
 		})
 	})
@@ -277,7 +342,9 @@ describe('get/set/del with ttl', () => {
 	test('get string ttl', done => {
 		cache.ttl(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toBeInRange(expectedExpireTime, expectedExpireTime + 3)
+
+			// Give the timestamp a little cushion in case of lag.
+			expect(value).toBeInRange(expectedExpireTime, expectedExpireTime + 30)
 			done()
 		})
 	})
@@ -318,7 +385,7 @@ describe('get/set/del with ttl', () => {
 
 	test('check that key does not exist', done => {
 		cache.get(testKey, (err, value) => {
-			expect(err).toEqual(expect.any(Error))
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
@@ -332,8 +399,10 @@ describe('key normalization', () => {
 	const testKey = random()
 	const testValue = random()
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set string', done => {
@@ -343,7 +412,7 @@ describe('key normalization', () => {
 	test('get string', done => {
 		cache.get(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
@@ -351,7 +420,7 @@ describe('key normalization', () => {
 	test('get string with different case', done => {
 		cache.get(utils.randomizeCase(testKey), (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
@@ -369,8 +438,10 @@ describe('key normalization as url', () => {
 	const testPoorlyFormedKey = utils.getRandomUrl(true)
 	const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set string with url', done => {
@@ -380,14 +451,14 @@ describe('key normalization as url', () => {
 	test('get string with url', done => {
 		cache.get(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
 
 	test('fail to get same string with random case on url', done => {
 		cache.get(utils.randomizeCase(testKey), (err, value) => {
-			expect(err).toEqual(expect.any(Error))
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
@@ -400,14 +471,14 @@ describe('key normalization as url', () => {
 	test('get string with poorly formed url', done => {
 		cache.get(testPoorlyFormedKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testPoorlyFormedValue)
+			expect(value).toEqual(testPoorlyFormedValue)
 			done()
 		})
 	})
 
 	test('fail to get same string with random case on poorly formed url', done => {
 		cache.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
-			expect(err).toEqual(expect.any(Error))
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
@@ -424,7 +495,7 @@ describe('key normalization as url', () => {
 			expect(err).toBeNull()
 			cache2.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
 				expect(err).toBeNull()
-				expect(value).toHaveProperty('Body', testPoorlyFormedValue)
+				expect(value).toEqual(testPoorlyFormedValue)
 				done()
 			})
 		})
@@ -443,8 +514,10 @@ describe('key normalization as path', () => {
 	const testPoorlyFormedKey = utils.getRandomPath(true)
 	const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
 
+	afterAll(done => cache.reset(done))
+
 	afterEach(() => {
-		debugLog(JSON.stringify(cache.s3.cache))
+		utils.debugLog(JSON.stringify(cache.s3.cache))
 	})
 
 	test('set string with path', done => {
@@ -454,14 +527,14 @@ describe('key normalization as path', () => {
 	test('get string with path', done => {
 		cache.get(testKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testValue)
+			expect(value).toEqual(testValue)
 			done()
 		})
 	})
 
 	test('fail to get same string with random case on path', done => {
 		cache.get(utils.randomizeCase(testKey), (err, value) => {
-			expect(err).toEqual(expect.any(Error))
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
@@ -474,14 +547,14 @@ describe('key normalization as path', () => {
 	test('get string with poorly formed path', done => {
 		cache.get(testPoorlyFormedKey, (err, value) => {
 			expect(err).toBeNull()
-			expect(value).toHaveProperty('Body', testPoorlyFormedValue)
+			expect(value).toEqual(testPoorlyFormedValue)
 			done()
 		})
 	})
 
 	test('fail to get same string with random case on poorly formed path', done => {
 		cache.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
-			expect(err).toEqual(expect.any(Error))
+			expect(err).toBeNull()
 			expect(value).toBeNull()
 			done()
 		})
@@ -498,7 +571,7 @@ describe('key normalization as path', () => {
 			expect(err).toBeNull()
 			cache2.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
 				expect(err).toBeNull()
-				expect(value).toHaveProperty('Body', testPoorlyFormedValue)
+				expect(value).toEqual(testPoorlyFormedValue)
 				done()
 			})
 		})

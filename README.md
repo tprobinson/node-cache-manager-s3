@@ -4,19 +4,19 @@ A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for
 
 <!-- MDTOC maxdepth:6 firsth1:1 numbering:0 flatten:0 bullets:1 updateOnSave:1 -->
 
-- [node-cache-manager-s3](#node-cache-manager-s3)   
-- [Usage](#Usage)   
-   - [Common Options](#Common-Options)   
-      - [Setting a default TTL](#Setting-a-default-TTL)   
-      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)   
-      - [Optimizing cache hits](#Optimizing-cache-hits)   
-   - [Overriding options per-request](#Overriding-options-per-request)   
-   - [Changing S3 Options](#Changing-S3-Options)   
-      - [Specifying S3 Region](#Specifying-S3-Region)   
-      - [Using an HTTP proxy](#Using-an-HTTP-proxy)   
-- [Full Options List](#Full-Options-List)   
-- [Known Issues / TODO](#Known-Issues-TODO)   
-- [License](#License)   
+- [node-cache-manager-s3](#node-cache-manager-s3)
+- [Usage](#Usage)
+   - [Common Options](#Common-Options)
+      - [Setting a default TTL](#Setting-a-default-TTL)
+      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)
+      - [Optimizing cache hits](#Optimizing-cache-hits)
+   - [Overriding options per-request](#Overriding-options-per-request)
+   - [Changing S3 Options](#Changing-S3-Options)
+      - [Specifying S3 Region](#Specifying-S3-Region)
+      - [Using an HTTP proxy](#Using-an-HTTP-proxy)
+- [Full Options List](#Full-Options-List)
+- [Known Issues / TODO](#Known-Issues-TODO)
+- [License](#License)
 
 <!-- /MDTOC -->
 
@@ -209,11 +209,29 @@ const s3CacheStore = new S3Cache({
 | s3Options | None | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property). |
 | s3Options.params | fill | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property). Parameters in here are included with every request to S3. Good for options like 'region'. |
 
+# Debugging
+
+<env vars>
 
 # Known Issues / TODO
 
 [ ] implement reset function?
 [ ] implement setex function?
+
+# Development
+
+Please use the included ESlint configuration to enforce style when developing. Use `yarn test` to run the linter and test suite before commits.
+
+To test with the real AWS SDK rather than a mocked one, set the following environment variables before running `yarn test`:
+* `USE_REAL_AWS`: "true" loads the real aws module instead of a fake
+* `AWS_ACCESS_KEY`: key
+* `AWS_SECRET_KEY`: secret key
+* `AWS_S3_BUCKET`: S3 bucket name
+
+**The tests will empty out the bucket, so be sure you're not testing against a bucket you care about!**
+
+To get a bunch of debugging from the test suite, use the following environment variables:
+* `S3CACHE_DEBUG_TESTS`: "true" make debug logging active in the test suite
 
 # License
 

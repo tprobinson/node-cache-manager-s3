@@ -66,6 +66,12 @@ class S3 {
 			cb()
 			return
 		}
+
+		// Initialize Bucket before putting key
+		if( !(params.Bucket in this.cache) ) {
+			this.cache[params.Bucket] = {}
+		}
+
 		this._log('getObject', params)
 		const err = this._checkPath(params, true, true)
 
@@ -74,7 +80,11 @@ class S3 {
 			return
 		}
 
-		cb(err, this.cache[params.Bucket][params.Key])
+		// Convert the object data into a Buffer before sending
+		const responseObject = Object.assign({}, this.cache[params.Bucket][params.Key])
+		responseObject.Body = Buffer.from(responseObject.Body)
+
+		cb(err, responseObject)
 		return {send: () => {}}
 	}
 
@@ -107,7 +117,7 @@ class S3 {
 		return {send: () => {}}
 	}
 
-	listObjects(inputParams = {}, cb) {
+	listObjectsV2(inputParams = {}, cb) {
 		const params = this._mergeParams(inputParams)
 
 		if( Object.keys(params).length === 0 ) {
@@ -117,17 +127,37 @@ class S3 {
 		}
 		this._log('listObjects', params)
 
-		let results = []
-		if( params.Bucket in this.cache ) {
-			results = this.cache[params.Bucket]
-		}
-
-		if( 'Prefix' in params ) {
-			cb(null, Object.values(results).filter(x => x.Key.startsWith(params.Prefix)))
+		if( !(params.Bucket in this.cache) ) {
+			cb(null, {Contents: []})
 			return
 		}
 
-		cb(null, Object.values(results))
+		let results = Object.values(this.cache[params.Bucket])
+
+		// Filter the results by key if requested.
+		if( 'Prefix' in params ) {
+			results = results.filter(x => x.Key.startsWith(params.Prefix))
+		}
+
+		const returnedStuff = {Contents: results}
+
+		// Slice the array if we're "continuing"
+		if( results.length > 1000 ) {
+			let sliceBegin = 0
+			if( params.ContinuationToken ) {
+				sliceBegin = params.ContinuationToken
+			}
+
+			let sliceEnd = Math.min(sliceBegin + 1000, results.length)
+			returnedStuff.Contents = results.slice(sliceBegin, sliceEnd)
+			returnedStuff.NextContinuationToken = sliceEnd
+
+			if( sliceEnd < results.length ) {
+				returnedStuff.IsTruncated = true
+			}
+		}
+
+		cb(null, returnedStuff)
 		return {send: () => {}}
 	}
 
@@ -158,6 +188,38 @@ class S3 {
 		return {send: () => {}}
 	}
 
+	deleteObjects(inputParams = {}, cb) {
+		const params = this._mergeParams(inputParams)
+		if( !cb ) {
+			cb = () => {}
+		}
+
+		if( Object.keys(params).length === 0 ) {
+			this._log('No params provided to deleteObjects, returning')
+			cb()
+			return
+		}
+		this._log('deleteObjects', params)
+
+		let err = null
+
+		for( let i = 0; i < params.Delete.Objects.length; i++ ) {
+			err = this._checkPath(params.Delete.Objects[i])
+
+			if( err instanceof Error ) {
+				cb(err, null)
+				return
+			}
+
+			if( params.Delete.Objects[i].Key in this.cache[params.Bucket] ) {
+				delete this.cache[params.Bucket][params.Key]
+			}
+		}
+
+		cb(err, {})
+		return {send: () => {}}
+	}
+
 	headObject(inputParams = {}, cb) {
 		if( !cb ) {
 			cb = () => {}
@@ -165,17 +227,18 @@ class S3 {
 
 		this.getObject(inputParams, (err, result) => {
 			if( result ) {
-				delete result.body
+				delete result.Body
+				delete result.Key
 			}
 
 			cb(err, result)
 		})
 		return {send: () => {}}
 	}
-
-	resetCache() {
-		this.cache = {}
-	}
 }
 
-module.exports = {S3}
+if( process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true) ) {
+	module.exports = require.requireActual('aws-sdk')
+} else {
+	module.exports = {S3}
+}

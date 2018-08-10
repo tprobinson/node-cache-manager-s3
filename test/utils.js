@@ -14,8 +14,35 @@ const largeRandomOptions = {
 	join: ', ',
 }
 
+let debugFuncActive = false
+
+// Determine whether we're using real params or random junk for the mock.
+const constructorParams = {}
+if( process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true) ) {
+	if(
+		!('AWS_ACCESS_KEY' in process.env) ||
+		!('AWS_SECRET_KEY' in process.env) ||
+		!('AWS_S3_BUCKET' in process.env)
+	) {
+		throw new Error('Required variables not found: AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_S3_BUCKET')
+	}
+
+	constructorParams.accessKey = process.env.AWS_ACCESS_KEY
+	constructorParams.secretKey = process.env.AWS_SECRET_KEY
+	constructorParams.bucket = process.env.AWS_S3_BUCKET
+} else {
+	constructorParams.accessKey = random(largeRandomOptions)
+	constructorParams.secretKey = random(largeRandomOptions)
+	constructorParams.bucket = random(largeRandomOptions)
+}
+
+if( process.env.S3CACHE_DEBUG_TESTS && (process.env.S3CACHE_DEBUG_TESTS === 'true' || process.env.S3CACHE_DEBUG_TESTS === true) ) {
+	debugFuncActive = true
+}
+
 module.exports = {
 	largeRandomOptions,
+	constructorParams,
 
 	toBeInRange(received, from, to) {
 		if( from === undefined || from === null || to === undefined || to === null ) {
@@ -45,11 +72,9 @@ module.exports = {
 		).join('')
 	},
 
-	debugLogFunc(debugMockCache) {
-		return message => {
-			if( debugMockCache ) {
-				console.log(message)
-			}
+	debugLog(message) {
+		if( debugFuncActive ) {
+			console.log(message)
 		}
 	},
 

@@ -14,11 +14,12 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "jest --coverage",
+    "test": "eslint src/ test/ __mocks__/; jest --coverage",
     "doc": "esdoc",
     "docdev": "esdoc && serve -s docs"
   },
   "devDependencies": {
+    "cache-manager": "^2.9.0",
     "esdoc": "^1.1.0",
     "esdoc-standard-plugin": "^1.0.0",
     "eslint": "^5.3.0",
@@ -41,13 +42,19 @@
   "esdoc": {
     "source": "./src",
     "destination": "./docs",
-    "plugins": [{
-      "name": "esdoc-standard-plugin"
-    }]
+    "plugins": [
+      {
+        "name": "esdoc-standard-plugin"
+      }
+    ]
   },
   "dependencies": {
+    "async": "^2.6.1",
     "aws-sdk": "^2.287.0",
+    "chalk": "^2.4.1",
     "checksum": "^0.1.1",
+    "loglevel": "^1.6.1",
+    "loglevel-plugin-prefix": "^0.8.4",
     "moment": "^2.22.2"
   }
 }
