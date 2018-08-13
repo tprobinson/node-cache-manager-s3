@@ -4,19 +4,21 @@ A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for
 
 <!-- MDTOC maxdepth:6 firsth1:1 numbering:0 flatten:0 bullets:1 updateOnSave:1 -->
 
-- [node-cache-manager-s3](#node-cache-manager-s3)
-- [Usage](#Usage)
-   - [Common Options](#Common-Options)
-      - [Setting a default TTL](#Setting-a-default-TTL)
-      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)
-      - [Optimizing cache hits](#Optimizing-cache-hits)
-   - [Overriding options per-request](#Overriding-options-per-request)
-   - [Changing S3 Options](#Changing-S3-Options)
-      - [Specifying S3 Region](#Specifying-S3-Region)
-      - [Using an HTTP proxy](#Using-an-HTTP-proxy)
-- [Full Options List](#Full-Options-List)
-- [Known Issues / TODO](#Known-Issues-TODO)
-- [License](#License)
+- [node-cache-manager-s3](#node-cache-manager-s3)   
+- [Usage](#Usage)   
+   - [Common Options](#Common-Options)   
+      - [Setting a default TTL](#Setting-a-default-TTL)   
+      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)   
+      - [Optimizing cache hits](#Optimizing-cache-hits)   
+   - [Changing S3 Options](#Changing-S3-Options)   
+      - [Specifying S3 Region](#Specifying-S3-Region)   
+      - [Using an HTTP proxy](#Using-an-HTTP-proxy)   
+   - [Overriding options per-request](#Overriding-options-per-request)   
+- [Full Options List](#Full-Options-List)   
+- [Debugging](#Debugging)   
+- [Known Issues / TODO](#Known-Issues-TODO)   
+- [Development](#Development)   
+- [License](#License)   
 
 <!-- /MDTOC -->
 
@@ -26,24 +28,24 @@ Create the cache object and use it in your cache-manager:
 ```js
 const cacheManager = require('cache-manager');
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
 })
 
 const s3Cache = cacheManager.caching({
-	store: s3CacheStore,
+  store: s3CacheStore,
 })
 
 s3Cache.set('foo', 'bar', {ttl: 360}, (err) => {
-    if (err) { throw err; }
+  if (err) { throw err; }
 
-    s3Cache.get('foo', (err, result) => {
-				if (err) { throw err; }
-        console.log(result);
-        // >> 'bar'
-        s3Cache.del('foo');
-    });
+  s3Cache.get('foo', (err, result) => {
+    if (err) { throw err; }
+    console.log(result);
+    // >> 'bar'
+    s3Cache.del('foo');
+  });
 });
 ```
 
@@ -58,18 +60,18 @@ Here are some common use cases:
 ### Setting a default TTL
 ```js
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   ttl: 360,
 })
 
 // or, in hours:
 
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   ttl: 12,
   ttlUnits: 'hours',
 })
@@ -80,9 +82,9 @@ Keep in mind that setting the ttlUnits in this way will not be set back to 'seco
 ### Storing all cache objects under a parent folder
 ```js
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   pathPrefix: 'cacheForApplicationOne',
 })
 ```
@@ -95,9 +97,9 @@ When storing URLs, `parseKeyAsUrl` will ensure that slashes are consistently for
 
 ```js
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   normalizeLowercase: true,
   parseKeyAsUrl: true,
   normalizeUrl: true,
@@ -110,11 +112,43 @@ Unless you know for sure that you have no case conflicts on your paths, `normali
 
 ```js
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   parseKeyAsPath: true,
   normalizePath: true,
+})
+```
+
+## Changing S3 Options
+Anything specified in the `s3Options` object in the constructor is passed to the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property)
+
+
+### Specifying S3 Region
+```js
+const s3CacheStore = new S3Cache({
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
+  s3Options: {
+    params: {
+      region: 'us-west-2',
+    },
+  },
+})
+```
+
+### Using an HTTP proxy
+```js
+const s3CacheStore = new S3Cache({
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
+  s3Options: {
+    httpOptions: {
+      proxy: 'http://my.proxy:3128'
+    }
+  },
 })
 ```
 
@@ -125,9 +159,9 @@ Options can be overridden per-request. Just specify in the options object of eac
 ```js
 // Default TTL of 5 minutes
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
   ttl: 360,
 })
 
@@ -140,12 +174,12 @@ S3 options can also be specified on individual requests via `s3Options`.
 Note that the object passed in will be applied to only the request-- it cannot influence the constructor params, and so it does not need 'params'.
 ```js
 const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
-	s3Options: {
-		region: 'us-west-2',
-	},
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
+  s3Options: {
+    region: 'us-west-2',
+  },
 })
 
 s3CacheStore.get('key', {
@@ -154,37 +188,6 @@ s3CacheStore.get('key', {
   },
 })
 ```
-
-## Changing S3 Options
-Anything specified in the `s3Options` object in the constructor is passed to the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property)
-
-
-### Specifying S3 Region
-```js
-const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
-	s3Options: {
-		region: 'us-west-2',
-	},
-})
-```
-
-### Using an HTTP proxy
-```js
-const s3CacheStore = new S3Cache({
-	accessKey: 'AAAAAAAA',
-	secretKey: 'asdnbklajsndkj',
-	bucket: 'my-cache-bucket',
-	s3Options: {
-		httpOptions: {
-			proxy: 'http://my.proxy:3128'
-		}
-	},
-})
-```
-
 
 # Full Options List
 
@@ -236,8 +239,8 @@ To set the default log level for every function, use `S3CACHE_LOGLEVEL`. The def
 
 # Known Issues / TODO
 
-[ ] implement setex function?
-[ ] convert to jsdoc/docstrap
+- [ ] implement setex function?
+- [ ] convert to jsdoc/docstrap
 
 # Development
 
