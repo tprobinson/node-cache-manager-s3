@@ -97,16 +97,17 @@ class S3Cache {
 	 * @param {string} options.secretKey                   - An AWS secret key
 	 * @param {string} options.bucket                      - The name of an AWS S3 bucket.
 	 *
-	 * @param {number|Object} [options.ttl]             - Paired with {@link options.ttlUnits}, amount in the future to set an object to expire. Can also be an Object, as supported by Moment.
-	 * @param {string} [options.ttlUnits=seconds]       - Paired with {@link options.ttl}, this is the unit of time to set an object to expire.
+	 * @param {number|Object} [options.ttl]                - Paired with {@link options.ttlUnits}, amount in the future to set an object to expire. Can also be an Object, as supported by Moment.
+	 * @param {string} [options.ttlUnits=seconds]          - Paired with {@link options.ttl}, this is the unit of time to set an object to expire.
 	 * @see http://momentjs.com/docs/#/manipulating/add/
 	 *
+	 * @param {string} [options.logLevel]                  - If specified, the default log level.
 	 * @param {string} [options.pathPrefix]                - If specified, all cache objects will be placed under this folder. Slashes are not necessary (unless for a nested folder)
 	 * @param {number} [options.folderPathDepth=2]         - The number of folders to chunk checksummed names into. Increases performance by nesting objects into folders. Set to 0 to disable.
 	 * @param {number} [options.folderPathChunkSize=2]     - The number of characters to use in each folder path chunk.
 	 *
-	 * @param {string} [options.checksumAlgorithm=md5]         - The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`)
-	 * @param {string} [options.checksumEncoding=hex]          - The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'.
+	 * @param {string} [options.checksumAlgorithm=md5]     - The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`)
+	 * @param {string} [options.checksumEncoding=hex]      - The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'.
 	 * @see https://nodejs.org/api/crypto.html#crypto_hash_digest_encoding
 	 *
 	 * @param {Boolean} [options.normalizeLowercase=false] - When normalizing, should the key be lowercased first? If using URLs, probably true. If using paths, probably false.
@@ -142,7 +143,7 @@ class S3Cache {
 			},
 		}
 
-		// If s3Options is provided, merge it with our constructorOptions object.
+		// If s3Options is provided, merge it with our constructorOptions object and create S3 object
 		if( 's3Options' in this.options ) {
 			if( typeof this.options.s3Options !== 'object' || this.options.s3Options === null ) {
 				throw new Error('Expected an object for s3Options!')
@@ -160,6 +161,10 @@ class S3Cache {
 		this.s3 = new S3(constructorOptions)
 
 		// Setup logging
+		if( 'S3CACHE_LOGLEVEL' in process.env && process.env.S3CACHE_LOGLEVEL ) {
+			this.options.logLevel = process.env.S3CACHE_LOGLEVEL
+		}
+
 		log.setLevel(this.options.logLevel)
 		prefix.reg(log)
 
@@ -169,7 +174,7 @@ class S3Cache {
 			},
 		})
 
-		this._log = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment']
+		this._log = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment', 'stringifyResponse']
 			.reduce((memo, type) => {
 				// Create the logger
 				Object.assign(memo, {[type]: log.getLogger(type)})
@@ -177,6 +182,8 @@ class S3Cache {
 				// Look for an environment variable with this logger's name to set level
 				if( `S3CACHE_${type.toUpperCase()}_LOGLEVEL` in process.env && process.env[`S3CACHE_${type.toUpperCase()}_LOGLEVEL`] ) {
 					memo[type].setLevel(process.env[`S3CACHE_${type.toUpperCase()}_LOGLEVEL`])
+				} else {
+					memo[type].setLevel(this.options.logLevel)
 				}
 
 				return memo
@@ -186,16 +193,17 @@ class S3Cache {
 	/**
 	 * Parses str as a URL, then sorts query parameters if {@link constructor.options.normalizeUrl} is true
 	 * @private
-	 * @param  {string} str - The input string
-	 * @return {string}     - The input string, normalized.
+	 * @param  {string} str                    - The input string
+	 * @param  {Object} [options=this.options] - Override options for the class
+	 * @return {string}                        - The input string, normalized.
 	 */
-	_normalizeUrl(str) {
+	_normalizeUrl(str, options = this.options) {
 		const request = url.parse(str)
 
-		if( this.options.normalizeUrl ) {
+		if( options.normalizeUrl ) {
 			if( request.search !== null ) {
-				// Sort query parameters.
-				const params = querystring.parse(request.search)
+				// Sort query parameters -- slice off the leading ?
+				const params = querystring.parse(request.search.slice(1))
 
 				// Sort param keys
 				request.search = Object.keys(params).sort().map(key =>
@@ -210,13 +218,14 @@ class S3Cache {
 	/**
 	 * Parses str as a path, then normalizes it if {@link constructor.options.normalizePath} is true
 	 * @private
-	 * @param  {string} str - The input string
-	 * @return {string}     - The input string, normalized.
+	 * @param  {string} str                    - The input string
+	 * @param  {Object} [options=this.options] - Override options for the class
+	 * @return {string}                        - The input string, normalized.
 	 */
-	_normalizePath(str) {
+	_normalizePath(str, options = this.options) {
 		let loc = path.format(path.parse(str))
 
-		if( this.options.normalizePath ) {
+		if( options.normalizePath ) {
 			loc = path.normalize(loc)
 		}
 
@@ -229,45 +238,46 @@ class S3Cache {
 	 * Will checksum and folder-chunk the path to make caching more efficient.
 	 * May prefix the key if {@link constructor.options.pathPrefix} is set.
 	 * Uses {@link _normalizeUrl} and {@link _normalizePath} if their respective options are set.
-	 * @param  {string} pathName - The input key
-	 * @return {string}          - The input key, as an S3-ready path.
+	 * @param  {string} pathName               - The input key
+	 * @param  {Object} [options=this.options] - Override options for the class
+	 * @return {string}                        - The input key, as an S3-ready path.
 	 */
-	_getPath(pathName) {
+	_getPath(pathName, options = this.options) {
 		let key = pathName
 
 		// Perform any normalization needed before we checksum
-		if( this.options.normalizeLowercase ) {
+		if( options.normalizeLowercase ) {
 			key = key.toLowerCase()
 		}
 
-		if( this.options.parseKeyAsUrl ) {
-			key = this._normalizeUrl(key)
-		} else if( this.options.parseKeyAsPath ) {
-			key = this._normalizePath(key)
+		if( options.parseKeyAsUrl ) {
+			key = this._normalizeUrl(key, options)
+		} else if( options.parseKeyAsPath ) {
+			key = this._normalizePath(key, options)
 		}
 
-		if( this.options.normalizeLowercase || this.options.parseKeyAsUrl || this.options.parseKeyAsPath ) {
+		if( options.normalizeLowercase || options.parseKeyAsUrl || options.parseKeyAsPath ) {
 			this._log.normalizePath.debug('Path normalized:', key)
 		}
 
 		// Checksum the path to remove all potentially bad characters
 		key = checksum(key, {
-			algorithm: this.options.checksumAlgorithm,
-			encoding: this.options.checksumEncoding,
+			algorithm: options.checksumAlgorithm,
+			encoding: options.checksumEncoding,
 		})
 
 		// Add a folder structure based on the hash.
 		const urlChunks = []
-		for( let depth = 0; depth < this.options.folderPathDepth; depth++ ) {
-			const begin = depth * this.options.folderPathChunkSize
-			const end = begin + this.options.folderPathChunkSize
+		for( let depth = 0; depth < options.folderPathDepth; depth++ ) {
+			const begin = depth * options.folderPathChunkSize
+			const end = begin + options.folderPathChunkSize
 			urlChunks.push(key.slice(begin, end))
 		}
 
 		key = urlChunks.join('/') + '/' + key
 
 		// Prefix it if desired
-		if( this.options.pathPrefix !== '' ) {
+		if( options.pathPrefix !== '' ) {
 			key = path.join(this.options.pathPrefix, key)
 		}
 
@@ -275,15 +285,25 @@ class S3Cache {
 		return key
 	}
 
+	/**
+	 * Converts S3 responses back into a data format we want.
+	 * @param  {S3Response} response Incoming response object
+	 * @return {string}
+	 */
 	_stringifyResponse(response) {
 		if( !response || !('Body' in response) ) {
-			console.log('Unknown response', response)
+			this._log.stringifyResponse.warn('Unknown response', response)
 			return response
 		}
 
 		return response.Body.toString()
 	}
 
+	/**
+	 * Ensures that incoming timestamps are a Moment object.
+	 * @param  {string|number} timestamp
+	 * @return {Moment}
+	 */
 	_timestampToMoment(timestamp) {
 		this._log.timestampToMoment.trace('Timestamp being converted to moment:', timestamp)
 
@@ -322,7 +342,7 @@ class S3Cache {
 		const currentOptions = Object.assign({}, this.options, options)
 
 		const requestOptions = {
-			Key: this._getPath(key),
+			Key: this._getPath(key, currentOptions),
 		}
 
 		this._log.get.trace(
@@ -403,7 +423,7 @@ class S3Cache {
 		const currentOptions = Object.assign({}, this.options, options)
 
 		const requestOptions = {
-			Key: this._getPath(key),
+			Key: this._getPath(key, currentOptions),
 			ACL: currentOptions.acl,
 			ContentType: currentOptions.contentType,
 			Body: value,
@@ -464,6 +484,7 @@ class S3Cache {
 
 		const requestOptions = {
 			Key: this._getPath(key),
+			// Key: this._getPath(key, currentOptions),
 		}
 
 		this._log.del.trace(
@@ -602,6 +623,7 @@ class S3Cache {
 
 		const requestOptions = {
 			Key: this._getPath(key),
+			// Key: this._getPath(key, currentOptions),
 		}
 
 		// Allow 's3Options' to override request options.
@@ -631,6 +653,12 @@ class S3Cache {
 		})
 	}
 
+	/**
+	 * Empties the entire bucket. Definitely a function to use with caution.
+	 * Uses a secret option on {@link keys}, called dontConcatPages, to make the
+	 * API a little happier.
+	 * @param {Function} cb The callback.
+	 */
 	reset(cb) {
 		this._log.reset.warn('Resetting bucket!')
 		async.waterfall([

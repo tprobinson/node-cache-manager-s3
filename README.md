@@ -188,35 +188,56 @@ const s3CacheStore = new S3Cache({
 
 # Full Options List
 
-| Name      | Default  | Description |
-| --------- | -------- | ----------- |
-| accessKey | required | An AWS access key |
-| secretKey | required | An AWS secret key |
-| bucket | required | The bucket to store in. |
-| ttl | None | Paired with `ttlUnits`, amount in the future to set an object to expire. Can also be an Object, as supported by [Moment](http://momentjs.com/docs/#/manipulating/add/). |
-| ttlUnits | seconds | Paired with `ttl`, this is the unit of time to set an object to expire. |
-| pathPrefix | None | If specified, all cache objects will be placed under this folder. Slashes are not necessary (unless for a nested folder) |
-| folderPathDepth | 2 | The number of folders to chunk checksummed names into. Increases performance by nesting objects into folders. Set to 0 to disable. |
-| folderPathChunkSize | 2 | The number of characters to use in each folder path chunk. |
-| checksumAlgorithm | md5 | The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`) |
-| checksumEncoding | hex | The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'. [Node docs](https://nodejs.org/api/crypto.html#crypto_hash_digest_encoding) |
-| normalizeLowercase | false | When normalizing, should the key be lowercased first? If using URLs, probably true. If using paths, probably false. |
-| parseKeyAsPath | false | Should the key be parsed as a path for normalization? |
-| normalizePath | true | If the key is parsed as a path, should we normalize it? (uses path.normalize) |
-| parseKeyAsUrl | false | Should the key be parsed as a URL for normalization? |
-| normalizeUrl | true | If the key is parsed as a URL, should we normalize it? (sorts query parameters) |
-| proactiveExpiry | false | If a key is marked as expired when we encounter it, should we delete it? Causes an additional request, but keeps the cache cleaner in case of `keys()` |
-| s3Options | None | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property). |
-| s3Options.params | fill | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property). Parameters in here are included with every request to S3. Good for options like 'region'. |
+| Name                | Default  | Description                                                                                                                                                                                                                 |
+| ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| accessKey           | required | An AWS access key                                                                                                                                                                                                           |
+| secretKey           | required | An AWS secret key                                                                                                                                                                                                           |
+| bucket              | required | The bucket to store in.                                                                                                                                                                                                     |
+| logLevel            | warn     | The default log level for all functions. See [Debugging](#debugging) below.                                                                                                                                                 |
+| ttl                 | None     | Paired with `ttlUnits`, amount in the future to set an object to expire. Can also be an Object, as supported by [Moment](http://momentjs.com/docs/#/manipulating/add/).                                                     |
+| ttlUnits            | seconds  | Paired with `ttl`, this is the unit of time to set an object to expire.                                                                                                                                                     |
+| pathPrefix          | None     | If specified, all cache objects will be placed under this folder. Slashes are not necessary (unless for a nested folder)                                                                                                    |
+| folderPathDepth     | 2        | The number of folders to chunk checksummed names into. Increases performance by nesting objects into folders. Set to 0 to disable.                                                                                          |
+| folderPathChunkSize | 2        | The number of characters to use in each folder path chunk.                                                                                                                                                                  |
+| checksumAlgorithm   | md5      | The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`)                                                                                                          |
+| checksumEncoding    | hex      | The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'. [Node docs](https://nodejs.org/api/crypto.html#crypto_hash_digest_encoding)                                        |
+| normalizeLowercase  | false    | When normalizing, should the key be lowercased first? If using URLs, probably true. If using paths, probably false.                                                                                                         |
+| parseKeyAsPath      | false    | Should the key be parsed as a path for normalization?                                                                                                                                                                       |
+| normalizePath       | true     | If the key is parsed as a path, should we normalize it? (uses path.normalize)                                                                                                                                               |
+| parseKeyAsUrl       | false    | Should the key be parsed as a URL for normalization?                                                                                                                                                                        |
+| normalizeUrl        | true     | If the key is parsed as a URL, should we normalize it? (sorts query parameters)                                                                                                                                             |
+| proactiveExpiry     | false    | If a key is marked as expired when we encounter it, should we delete it? Causes an additional request, but keeps the cache cleaner in case of `keys()`                                                                      |
+| s3Options           | None     | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property).                                                                                           |
+| s3Options.params    | fill     | An object passed into the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property). Parameters in here are included with every request to S3. Good for options like 'region'. |
 
 # Debugging
 
-<env vars>
+S3Cache has a bunch of configurable logging. To enable logging for any individual function, set an environment variable like `S3CACHE_<function>_LOGLEVEL` to a valid [loglevel](https://www.npmjs.com/package/loglevel#documentation) string.
+
+For example, to enable logging for all GET requests:
+```sh
+env S3CACHE_GET_LOGLEVEL=debug node myprogram.js
+```
+
+Valid function names:
+* `GET`
+* `SET`
+* `DEL`
+* `TTL`
+* `KEYS`
+* `HEAD`
+* `RESET`
+* `NORMALIZEPATH` -- good for making sure your keys aren't getting mangled.
+* `TIMESTAMPTOMOMENT` -- probably not useful
+* `STRINGIFYRESPONSE` -- not useful
+
+
+To set the default log level for every function, use `S3CACHE_LOGLEVEL`. The default is `warn`.
 
 # Known Issues / TODO
 
-[ ] implement reset function?
 [ ] implement setex function?
+[ ] convert to jsdoc/docstrap
 
 # Development
 
@@ -230,8 +251,10 @@ To test with the real AWS SDK rather than a mocked one, set the following enviro
 
 **The tests will empty out the bucket, so be sure you're not testing against a bucket you care about!**
 
-To get a bunch of debugging from the test suite, use the following environment variables:
+To get a bunch of debugging from the test suite, use the following environment variable:
 * `S3CACHE_DEBUG_TESTS`: "true" make debug logging active in the test suite
+
+To generate documentation, use `yarn doc` or `yarn docdev`.
 
 # License
 

@@ -14,11 +14,13 @@ const largeRandomOptions = {
 	join: ', ',
 }
 
+const usingRealAws = process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true)
+
 let debugFuncActive = false
 
 // Determine whether we're using real params or random junk for the mock.
 const constructorParams = {}
-if( process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true) ) {
+if( usingRealAws ) {
 	if(
 		!('AWS_ACCESS_KEY' in process.env) ||
 		!('AWS_SECRET_KEY' in process.env) ||
@@ -43,6 +45,37 @@ if( process.env.S3CACHE_DEBUG_TESTS && (process.env.S3CACHE_DEBUG_TESTS === 'tru
 module.exports = {
 	largeRandomOptions,
 	constructorParams,
+	usingRealAws,
+
+	setAllLogLevels(typeList, logLevel) {
+		const oldLogLevels = {}
+
+		if( Array.isArray(typeList) ) {
+			typeList.forEach(type => {
+				const envName = `S3CACHE_${type.toUpperCase()}_LOGLEVEL`
+				oldLogLevels[type] = process.env[envName]
+
+				if( logLevel ) {
+					process.env[envName] = logLevel
+				} else {
+					delete process.env[envName]
+				}
+			})
+		} else {
+			Object.keys(typeList).forEach(type => {
+				const envName = `S3CACHE_${type.toUpperCase()}_LOGLEVEL`
+				oldLogLevels[type] = process.env[envName]
+
+				if( typeList[type] ) {
+					process.env[envName] = typeList[type]
+				} else {
+					delete process.env[envName]
+				}
+			})
+		}
+
+		return oldLogLevels
+	},
 
 	toBeInRange(received, from, to) {
 		if( from === undefined || from === null || to === undefined || to === null ) {

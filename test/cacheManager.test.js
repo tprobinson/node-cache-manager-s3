@@ -1,11 +1,7 @@
 const cacheManager = require('cache-manager')
 const S3Cache = require('../src/index.js')
 const utils = require('./utils')
-const random = require('random-words')
-const moment = require('moment')
 const async = require('async')
-
-const usingRealAws = process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true)
 
 const keyParams = utils.constructorParams
 
@@ -37,21 +33,22 @@ describe('basic function test', () => {
 	const cache = cacheManager.caching({
 		store: s3Cache
 	})
-	const crappedFunc = (input, cb) =>
-		cache.wrap(input, cacheCallback => {
-			cacheMe(input, cacheCallback)
-		}, cb)
+	// const crappedFunc = (input, cb) =>
+	// 	cache.wrap(input, cacheCallback => {
+	// 		cacheMe(input, cacheCallback)
+	// 	}, cb)
 
 	const wrappedFunc = (id, cb) => {
 		cache.get(id, function (err, result) {
+			if( err ) { return cb(err) }
 
 			if( result !== null ) {
 				return cb(null, result)
 			}
 
-			cacheMe(id, function (err, result) {
-				if(err) { return cb(err) }
-				cache.set(id, result, cb(null, result))
+			cacheMe(id, function (cacheErr, cacheResult) {
+				if( cacheErr ) { return cb(cacheErr) }
+				cache.set(id, cacheResult, cb(null, cacheResult))
 			})
 		})
 	}
@@ -68,14 +65,20 @@ describe('basic function test', () => {
 	})
 
 	test('try function out', done => {
-		async.timesSeries(3, (n, timesCb) => wrappedFunc('2', timesCb),
-			(err, results) => {
-				expect(err).toBeNull()
-				expect(results[0]).toEqual('4')
-				expect(results[1]).toEqual('4')
-				expect(results[2]).toEqual('4')
-				done()
-			}
-		)
+		const s3Sleep = 100
+		async.series([
+			// Sleeps are to allow S3 time to settle.
+			seriesCb => wrappedFunc('2', seriesCb),
+			seriesCb => setTimeout(seriesCb, s3Sleep),
+			seriesCb => wrappedFunc('2', seriesCb),
+			seriesCb => setTimeout(seriesCb, s3Sleep),
+			seriesCb => wrappedFunc('2', seriesCb),
+		], (err, results) => {
+			expect(err).toBeNull()
+			expect(results[0]).toEqual('4')
+			expect(results[2]).toEqual('4')
+			expect(results[4]).toEqual('4')
+			done()
+		})
 	})
 })

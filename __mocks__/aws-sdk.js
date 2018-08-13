@@ -1,3 +1,5 @@
+class UnexpectedParameter extends Error {}
+
 class S3 {
 	constructor(config) {
 		this.config = config
@@ -73,6 +75,12 @@ class S3 {
 		}
 
 		this._log('getObject', params)
+
+		if( 'PleaseBreakApi' in params ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
+			return
+		}
+
 		const err = this._checkPath(params, true, true)
 
 		if( err instanceof Error ) {
@@ -100,6 +108,12 @@ class S3 {
 			return
 		}
 		this._log('putObject', params)
+
+		if( 'PleaseBreakApi' in params ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
+			return
+		}
+
 		const err = this._checkPath(params)
 
 		if( err instanceof Error ) {
@@ -129,6 +143,11 @@ class S3 {
 
 		if( !(params.Bucket in this.cache) ) {
 			cb(null, {Contents: []})
+			return
+		}
+
+		if( 'PleaseBreakApi' in params ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
 			return
 		}
 
@@ -173,6 +192,12 @@ class S3 {
 			return
 		}
 		this._log('deleteObject', params)
+
+		if( 'PleaseBreakApi' in params ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
+			return
+		}
+
 		const err = this._checkPath(params)
 
 		if( err instanceof Error ) {
@@ -201,6 +226,11 @@ class S3 {
 		}
 		this._log('deleteObjects', params)
 
+		if( 'PleaseBreakApi' in params ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
+			return
+		}
+
 		let err = null
 
 		for( let i = 0; i < params.Delete.Objects.length; i++ ) {
@@ -223,6 +253,11 @@ class S3 {
 	headObject(inputParams = {}, cb) {
 		if( !cb ) {
 			cb = () => {}
+		}
+
+		if( 'PleaseBreakApi' in inputParams ) {
+			cb(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"), null)
+			return
 		}
 
 		this.getObject(inputParams, (err, result) => {

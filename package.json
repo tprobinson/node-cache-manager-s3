@@ -1,6 +1,6 @@
 {
   "name": "node-cache-manager-s3",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Cache manager module for S3",
   "main": "src/index.js",
   "repository": "https://github.com/tprobinson/node-cache-manager-s3.git",
@@ -14,7 +14,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "eslint src/ test/ __mocks__/; jest --coverage",
+    "test": "eslint src/ test/ __mocks__/; jest --coverage --runInBand",
     "doc": "esdoc",
     "docdev": "esdoc && serve -s docs"
   },
@@ -42,11 +42,9 @@
   "esdoc": {
     "source": "./src",
     "destination": "./docs",
-    "plugins": [
-      {
-        "name": "esdoc-standard-plugin"
-      }
-    ]
+    "plugins": [{
+      "name": "esdoc-standard-plugin"
+    }]
   },
   "dependencies": {
     "async": "^2.6.1",
