@@ -1,5 +1,5 @@
 {
-  "name": "node-cache-manager-s3",
+  "name": "cache-manager-s3",
   "version": "1.0.0",
   "description": "Cache manager module for S3",
   "main": "src/index.js",
