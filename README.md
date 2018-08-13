@@ -1,10 +1,10 @@
-# node-cache-manager-s3
+# cache-manager-s3
 
 A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for storing results in S3.
 
 <!-- MDTOC maxdepth:6 firsth1:1 numbering:0 flatten:0 bullets:1 updateOnSave:1 -->
 
-- [node-cache-manager-s3](#node-cache-manager-s3)   
+- [cache-manager-s3](#cache-manager-s3)   
 - [Usage](#Usage)   
    - [Common Options](#Common-Options)   
       - [Setting a default TTL](#Setting-a-default-TTL)   
@@ -21,6 +21,14 @@ A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for
 - [License](#License)   
 
 <!-- /MDTOC -->
+
+[![https://nodei.co/npm/cache-manager-s3.svg?downloads=true&downloadRank=true&stars=true](https://nodei.co/npm/cache-manager-s3.svg?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/cache-manager-s3)
+
+[![npm version](https://badge.fury.io/js/cache-manager-s3.svg)](https://badge.fury.io/js/cache-manager-s3)
+[![Dependency Status](https://david-dm.org/tprobinson/node-cache-manager-s3.svg)](https://david-dm.org)
+
+master: [![Build Status](https://travis-ci.org/tprobinson/node-cache-manager-s3.svg?branch=master)](https://travis-ci.org/tprobinson/node-cache-manager-s3)
+[![Docs Status](https://inch-ci.org/github/tprobinson/node-cache-manager-s3.svg?branch=master)](https://inch-ci.org/github/tprobinson/node-cache-manager-s3)
 
 # Usage
 
