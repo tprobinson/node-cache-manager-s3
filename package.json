@@ -14,12 +14,16 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "eslint src/ test/ __mocks__/; jest --coverage --runInBand",
+    "lint": "eslint src/ test/ __mocks__/",
+    "test": "yarn run lint; jest --maxWorkers=4",
+    "test:coveralls": "yarn run test --coverage --coverageReporters=text-lcov | yarn exec coveralls",
+    "test:real": "yarn run lint; env USE_REAL_AWS=true yarn run test --runInBand",
     "doc": "esdoc",
     "docdev": "esdoc && serve -s docs"
   },
   "devDependencies": {
     "cache-manager": "^2.9.0",
+    "coveralls": "^3.0.2",
     "esdoc": "^1.1.0",
     "esdoc-standard-plugin": "^1.0.0",
     "eslint": "^5.3.0",
