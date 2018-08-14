@@ -27,6 +27,7 @@ A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for
 [![npm version](https://badge.fury.io/js/cache-manager-s3.svg)](https://badge.fury.io/js/cache-manager-s3)
 [![Dependency Status](https://david-dm.org/tprobinson/node-cache-manager-s3.svg)](https://david-dm.org)
 [![Coverage Status](https://coveralls.io/repos/github/tprobinson/node-cache-manager-s3/badge.svg?branch=master)](https://coveralls.io/github/tprobinson/node-cache-manager-s3?branch=master)
+[![Known Vulnerabilities](https://snyk.io/test/github/tprobinson/node-cache-manager-s3/badge.svg?targetFile=package.json)](https://snyk.io/test/github/tprobinson/node-cache-manager-s3?targetFile=package.json)
 
 master: [![Build Status](https://travis-ci.org/tprobinson/node-cache-manager-s3.svg?branch=master)](https://travis-ci.org/tprobinson/node-cache-manager-s3)
 [![Docs Status](https://inch-ci.org/github/tprobinson/node-cache-manager-s3.svg?branch=master)](https://inch-ci.org/github/tprobinson/node-cache-manager-s3)
