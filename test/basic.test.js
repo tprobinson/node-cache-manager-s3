@@ -45,6 +45,14 @@ describe('class construction options', () => {
 describe('basic function test', () => {
 	const testKey = random()
 	const testValue = random()
+
+	const testUnicodeKey = random()
+	const testUnicodeValue = '関係なく　文字。'
+
+	const testBinaryKey = random()
+	// One-pixel transparent GIF
+	const testBinaryValue = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64')
+
 	const largeCountOfKeys = (Math.random() + 1) * 100 + 1000
 	const largeListOfKeys = []
 	for( let i = largeCountOfKeys; i > 0; i-- ) {
@@ -145,5 +153,29 @@ describe('basic function test', () => {
 		expect(() => cache.get(1)).toThrow()
 		expect(() => cache.set(1, 2)).toThrow()
 		done()
+	})
+
+	test('unicode string safety', done => {
+		async.series([
+			seriesCb => cache.set(testUnicodeKey, testUnicodeValue, seriesCb),
+			seriesCb => cache.get(testUnicodeKey, seriesCb),
+		], (err, values) => {
+			expect(err).toBeNull()
+			expect(values[1]).toEqual(testUnicodeValue)
+			done()
+		})
+	})
+
+	test('binary data safety', done => {
+		async.series([
+			seriesCb => cache.set(testBinaryKey, testBinaryValue, seriesCb),
+			seriesCb => cache.get(testBinaryKey, seriesCb),
+			seriesCb => cache.get(testBinaryKey, {stringifyResponses: false}, seriesCb),
+		], (err, values) => {
+			expect(err).toBeNull()
+			expect(values[1]).not.toEqual(testBinaryValue)
+			expect(values[2]).toEqual(testBinaryValue)
+			done()
+		})
 	})
 })

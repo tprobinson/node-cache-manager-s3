@@ -17,7 +17,7 @@ const defaultOptions = {
 	ttl: 0,
 	ttlUnits: 'seconds',
 	pathPrefix: '',
-	stringifyValues: true,
+	stringifyResponses: true,
 
 	// Options for folder chunking
 	folderPathDepth: 2,
@@ -288,15 +288,19 @@ class S3Cache {
 	/**
 	 * Converts S3 responses back into a data format we want.
 	 * @param  {S3Response} response Incoming response object
+	 * @param {Object} [options=this.options] Incoming options
 	 * @return {string}
 	 */
-	_stringifyResponse(response) {
+	_stringifyResponse(response, options = this.options) {
 		if( !response || !('Body' in response) ) {
 			this._log.stringifyResponse.warn('Unknown response', response)
 			return response
 		}
 
-		return response.Body.toString()
+		if( options.stringifyResponses ) {
+			return response.Body.toString()
+		}
+		return response.Body
 	}
 
 	/**
@@ -382,7 +386,7 @@ class S3Cache {
 				}
 
 				this._log.get.trace('get returning result:', result)
-				waterCb(null, this._stringifyResponse(result))
+				waterCb(null, this._stringifyResponse(result, currentOptions))
 			}
 		], (err, result) => {
 			if( err instanceof Error && err.statusCode === 404 ) {
@@ -426,7 +430,13 @@ class S3Cache {
 			Key: this._getPath(key, currentOptions),
 			ACL: currentOptions.acl,
 			ContentType: currentOptions.contentType,
-			Body: value,
+		}
+
+		// Coerce the value into a buffer. This ensures binary or unicode data is safe
+		if( value instanceof Buffer ) {
+			requestOptions.Body = value
+		} else {
+			requestOptions.Body = Buffer.from(value)
 		}
 
 		if( currentOptions.ttl ) {

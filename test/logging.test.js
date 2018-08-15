@@ -112,4 +112,13 @@ describe('test internal functions with alternate parameters', () => {
 		const path = utils.getRandomPath()
 		expect(cache._normalizePath(path)).toEqual(path)
 	})
+
+	test('stringifyResponse handles strings and buffers', () => {
+		const string = random()
+		const bufferString = random()
+		const buffer = Buffer.from(bufferString)
+		expect(cache._stringifyResponse({Body: string})).toEqual(string)
+		expect(cache._stringifyResponse({Body: buffer})).toEqual(bufferString)
+		expect(cache._stringifyResponse({Body: buffer}, {stringifyResponse: false})).toEqual(buffer)
+	})
 })

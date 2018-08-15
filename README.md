@@ -4,21 +4,21 @@ A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for
 
 <!-- MDTOC maxdepth:6 firsth1:1 numbering:0 flatten:0 bullets:1 updateOnSave:1 -->
 
-- [cache-manager-s3](#cache-manager-s3)   
-- [Usage](#Usage)   
-   - [Common Options](#Common-Options)   
-      - [Setting a default TTL](#Setting-a-default-TTL)   
-      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)   
-      - [Optimizing cache hits](#Optimizing-cache-hits)   
-   - [Changing S3 Options](#Changing-S3-Options)   
-      - [Specifying S3 Region](#Specifying-S3-Region)   
-      - [Using an HTTP proxy](#Using-an-HTTP-proxy)   
-   - [Overriding options per-request](#Overriding-options-per-request)   
-- [Full Options List](#Full-Options-List)   
-- [Debugging](#Debugging)   
-- [Known Issues / TODO](#Known-Issues-TODO)   
-- [Development](#Development)   
-- [License](#License)   
+- [cache-manager-s3](#cache-manager-s3)
+- [Usage](#Usage)
+   - [Common Options](#Common-Options)
+      - [Setting a default TTL](#Setting-a-default-TTL)
+      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)
+      - [Optimizing cache hits](#Optimizing-cache-hits)
+   - [Changing S3 Options](#Changing-S3-Options)
+      - [Specifying S3 Region](#Specifying-S3-Region)
+      - [Using an HTTP proxy](#Using-an-HTTP-proxy)
+   - [Overriding options per-request](#Overriding-options-per-request)
+- [Full Options List](#Full-Options-List)
+- [Debugging](#Debugging)
+- [Known Issues / TODO](#Known-Issues-TODO)
+- [Development](#Development)
+- [License](#License)
 
 <!-- /MDTOC -->
 
@@ -129,6 +129,25 @@ const s3CacheStore = new S3Cache({
   normalizePath: true,
 })
 ```
+
+### Storing non-string data
+
+By default, this store stringifies responses. This means that any data stored that is not a string will not match when it is retrieved. To disable this behavior, use the `stringifyResponses` option on the constructor or on individual `.get` requests.
+
+```js
+const s3CacheStore = new S3Cache({
+  accessKey: 'AAAAAAAA',
+  secretKey: 'asdnbklajsndkj',
+  bucket: 'my-cache-bucket',
+  stringifyResponses: false,
+})
+
+s3CacheStore.get('suchandsuch', {stringifyResponses: false}, (err, result) => {})
+```
+
+If `stringifyResponses` is set to `false`, **all** responses will be returned as Buffers because of how the S3 API communicates. This is particularly useful for storing objects like pictures, but can be troublesome if you're storing mixed content.
+
+Setting 'ContentType' as an s3Option on `.set` requests, then reading that to determine how to handle incoming data on `.get` requests may be a way to handle mixed content.
 
 ## Changing S3 Options
 Anything specified in the `s3Options` object in the constructor is passed to the [S3 constructor](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property)
