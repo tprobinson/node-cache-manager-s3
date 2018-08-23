@@ -3,6 +3,11 @@
   "version": "1.1.0",
   "description": "Cache manager module for S3",
   "main": "src/index.js",
+  "keywords": [
+    "cache", "caching", "cache-manager",
+    "s3", "aws", "bucket",
+    "plugin", "backend", "module"
+  ],
   "repository": "https://github.com/tprobinson/node-cache-manager-s3.git",
   "bugs": {
     "url": "https://github.com/tprobinson/node-cache-manager-s3.git/issues"
