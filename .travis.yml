@@ -9,4 +9,4 @@ jobs:
     - stage: Produce Coverage
       node_js: node
       script:
-      - yarn run test:coveralls yarn exec coveralls
+      - yarn run test:coveralls
