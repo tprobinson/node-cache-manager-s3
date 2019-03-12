@@ -423,6 +423,14 @@ class S3Cache {
 			}
 		}
 
+		if( value === null || value === undefined ) {
+			if( cb ) {
+				cb(new Error('Attempted to set an un-Buffer-able value'))
+				return
+			}
+			return
+		}
+
 		// Allow per-request options to override constructor options.
 		const currentOptions = Object.assign({}, this.options, options)
 
@@ -436,7 +444,19 @@ class S3Cache {
 		if( value instanceof Buffer ) {
 			requestOptions.Body = value
 		} else {
-			requestOptions.Body = Buffer.from(value)
+			try {
+				requestOptions.Body = Buffer.from(value)
+			} catch (e) {
+				// If we couldn't Buffer the value, blow up.
+				if( e instanceof TypeError ) {
+					this._log.set.warn('Attempted to set an un-Buffer-able value on key:', key, 'value:', value)
+					if( cb ) {
+						cb(new Error('Attempted to set an un-Buffer-able value'))
+					}
+					return
+				}
+				throw e
+			}
 		}
 
 		if( currentOptions.ttl ) {
