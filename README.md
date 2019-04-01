@@ -2,25 +2,30 @@
 
 A [cache-manager](https://github.com/BryanDonovan/node-cache-manager) module for storing results in S3.
 
-<!-- MDTOC maxdepth:6 firsth1:1 numbering:0 flatten:0 bullets:1 updateOnSave:1 -->
-
+<!-- TOC START min:1 max:3 link:true asterisk:false update:true -->
 - [cache-manager-s3](#cache-manager-s3)
-- [Usage](#Usage)
-   - [Common Options](#Common-Options)
-      - [Setting a default TTL](#Setting-a-default-TTL)
-      - [Storing all cache objects under a parent folder](#Storing-all-cache-objects-under-a-parent-folder)
-      - [Optimizing cache hits](#Optimizing-cache-hits)
-   - [Changing S3 Options](#Changing-S3-Options)
-      - [Specifying S3 Region](#Specifying-S3-Region)
-      - [Using an HTTP proxy](#Using-an-HTTP-proxy)
-   - [Overriding options per-request](#Overriding-options-per-request)
-- [Full Options List](#Full-Options-List)
-- [Debugging](#Debugging)
-- [Known Issues / TODO](#Known-Issues-TODO)
-- [Development](#Development)
-- [License](#License)
+- [Usage](#usage)
+  - [Common Options](#common-options)
+    - [Setting a default TTL](#setting-a-default-ttl)
+    - [Storing all cache objects under a parent folder](#storing-all-cache-objects-under-a-parent-folder)
+    - [Optimizing cache hits](#optimizing-cache-hits)
+    - [Storing non-string data](#storing-non-string-data)
+  - [Changing S3 Options](#changing-s3-options)
+    - [Specifying S3 Region](#specifying-s3-region)
+    - [Using an HTTP proxy](#using-an-http-proxy)
+  - [Overriding options per-request](#overriding-options-per-request)
+  - [How Items are Stored in S3](#how-items-are-stored-in-s3)
+    - [MD5](#md5)
+    - [Base64](#base64)
+    - [No Encoding](#no-encoding)
+- [Full Options List](#full-options-list)
+- [Debugging](#debugging)
+- [Known Issues / TODO](#known-issues--todo)
+- [Development](#development)
+- [License](#license)
+<!-- TOC END -->
 
-<!-- /MDTOC -->
+
 
 [![https://nodei.co/npm/cache-manager-s3.svg?downloads=true&downloadRank=true&stars=true](https://nodei.co/npm/cache-manager-s3.svg?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/cache-manager-s3)
 
@@ -218,6 +223,99 @@ s3CacheStore.get('key', {
 })
 ```
 
+## How Items are Stored in S3
+
+Due to the unpredictability of incoming data, data stored in S3 has its key hashed to prevent special characters or even binary data from messing up the S3 API.
+
+By default, this is an MD5 checksum. This takes full advantage of S3 because it is binary-safe and can be evenly sharded among multiple folder prefixes, which is recommended in the [S3 API performance](https://docs.aws.amazon.com/AmazonS3/latest/dev/request-rate-perf-considerations.html) documentation.
+
+However, this has a distinct disadvantage: MD5 is a non-trivially-reversible hash, so clearing the cache based on anything other than an exact path is very difficult (aside from a total cache wipe).
+
+An example of when this would be a disadvantage is if you were storing a catalog and wanted to clear your cache of all variants of a particular product.
+
+### MD5
+Using the following path structure:
+
+```
+apples/
+  apples/red
+  apples/blue
+
+bananas/
+  bananas/yellow
+  bananas/crazy
+```
+
+With default options, the cache bucket would look like the following:
+```
+fd/
+  fd/c6/
+    fd/c6/fdc6b42636254539e5af35a0a63c6b1b
+
+e3/
+  e3/3e/
+    e3/3e/e33e0a47d9f120706019c42b4f6d7751
+
+74/
+  74/6d/
+    74/6d/7f6d5d1fb90a43b34704bfd3fe6a99ac
+
+fa/
+  fa/55/
+    fa/55/fa5505657ed82b895c6a3535ba4a6c59
+```
+
+No information about the path is preserved in this structure.
+
+### Base64
+Compare this to the following settings that use `base64` instead:
+```js
+{
+  checksumAlgorithm: 'none',
+  checksumEncoding: 'base64',
+  folderPathChunkSize: 7,
+}
+```
+
+```
+YXBwbGV/
+  YXBwbGV/zL3JlZA/
+    YXBwbGV/zL3JlZA/YXBwbGVzL3JlZA==
+  YXBwbGV/zL2JsdW/
+    YXBwbGV/zL2JsdW/YXBwbGVzL2JsdWU=
+
+YmFuYW5/
+  YmFuYW5/hcy95ZW/
+    YmFuYW5/hcy95ZW/YmFuYW5hcy95ZWxsb3c=
+  YmFuYW5/hcy9jcm/
+    YmFuYW5/hcy9jcm/YmFuYW5hcy9jcmF6eQ==
+```
+
+The paths above, while somewhat clumsily dividing product categories, can be decoded to its original path components. If you wanted to clear the cache of all `apple` products, it would be much easier in this configuration. However, S3 performance in this case is somoewhat dependent on how much variety is in the original paths, and the particular size of `folderPathChunkSize`.
+
+
+### No Encoding
+If you are certain that your paths will not contain any URL-unsafe characters, then you can use the following settings to remove all encoding from your keys:
+```js
+{
+  checksumAlgorithm: 'none',
+  folderPathChunkSize: 0,
+}
+```
+
+```
+apples/
+  apples/red
+  apples/blue
+
+bananas/
+  bananas/yellow
+  bananas/crazy
+```
+
+This has the advantage of being completely readable by using your original path structure, avoiding any clumsiness with the `folderPathChunkSize` dividing the original words unevenly. These settings do not ensure filename sharding at all.
+
+
 # Full Options List
 
 | Name                | Default  | Description                                                                                                                                                                                                                 |
@@ -231,8 +329,8 @@ s3CacheStore.get('key', {
 | pathPrefix          | None     | If specified, all cache objects will be placed under this folder. Slashes are not necessary (unless for a nested folder)                                                                                                    |
 | folderPathDepth     | 2        | The number of folders to chunk checksummed names into. Increases performance by nesting objects into folders. Set to 0 to disable.                                                                                          |
 | folderPathChunkSize | 2        | The number of characters to use in each folder path chunk.                                                                                                                                                                  |
-| checksumAlgorithm   | md5      | The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`)                                                                                                          |
-| checksumEncoding    | hex      | The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'. [Node docs](https://nodejs.org/api/crypto.html#crypto_hash_digest_encoding)                                        |
+| checksumAlgorithm   | md5      | The digest algorithm to use when checksumming. Supports any OpenSSL digest (use `openssl list -digest-algorithms`) as well as 'none'. When 'none' and `checksumEncoding` is 'base64', the key will be Base64-encoded.       |
+| checksumEncoding    | hex      | The encoding to use for the digest. Valid values (as of this writing) are 'hex', 'latin1', and 'base64'. [Node docs](https://nodejs.org/api/crypto.html#crypto_hash_digest_encoding).                                       |
 | normalizeLowercase  | false    | When normalizing, should the key be lowercased first? If using URLs, probably true. If using paths, probably false.                                                                                                         |
 | parseKeyAsPath      | false    | Should the key be parsed as a path for normalization?                                                                                                                                                                       |
 | normalizePath       | true     | If the key is parsed as a path, should we normalize it? (uses path.normalize)                                                                                                                                               |

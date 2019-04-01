@@ -15,110 +15,110 @@ jest.spyOn(global.console, 'warn').mockImplementation(fakeConsoleWarn)
 jest.spyOn(global.console, 'error').mockImplementation(fakeConsoleError)
 
 describe('logging', () => {
-	test('debug logging with option', done => {
-		const cache = new S3Cache(Object.assign({}, keyParams, {logLevel: 'TRACE'}))
+  test('debug logging with option', done => {
+    const cache = new S3Cache(Object.assign({}, keyParams, {logLevel: 'TRACE'}))
 
-		cache.keys(() => {
-			expect(fakeConsoleLog).toHaveBeenCalled()
-			done()
-		})
-	})
+    cache.keys(() => {
+      expect(fakeConsoleLog).toHaveBeenCalled()
+      done()
+    })
+  })
 
-	test('debug logging with env var', done => {
-		const testKey = random()
-		const testValue = random()
+  test('debug logging with env var', done => {
+    const testKey = random()
+    const testValue = random()
 
-		// Set everything to TRACE.
-		const logTypes = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment', 'stringifyResponse']
-		const logLevel = 'TRACE'
+    // Set everything to TRACE.
+    const logTypes = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment', 'stringifyResponse']
+    const logLevel = 'TRACE'
 
-		const oldLogLevels = utils.setAllLogLevels(logTypes, logLevel)
-		const mainOldLogLevel = process.env.S3CACHE_LOGLEVEL
-		process.env.S3CACHE_LOGLEVEL = logLevel
+    const oldLogLevels = utils.setAllLogLevels(logTypes, logLevel)
+    const mainOldLogLevel = process.env.S3CACHE_LOGLEVEL
+    process.env.S3CACHE_LOGLEVEL = logLevel
 
-		const cache = new S3Cache(keyParams)
+    const cache = new S3Cache(keyParams)
 
-		beforeAll(done => cache.reset(done))
-		afterAll(done => cache.reset(done))
+    beforeAll(done => cache.reset(done))
+    afterAll(done => cache.reset(done))
 
-		// Mimic the basic test suite, with logging.
-		async.series([
-			seriesCb => cache.set(testKey, testValue, seriesCb),
-			seriesCb => cache.get(testKey, (err, value) => {
-				expect(err).toBeNull()
-				expect(value).toEqual(testValue)
-				seriesCb()
-			}),
-			seriesCb => cache.ttl(testKey, (err, value) => {
-				expect(err).toBeNull()
-				expect(value).toEqual(-1)
-				seriesCb()
-			}),
-			seriesCb => cache.keys((err, values) => {
-				expect(err).toBeNull()
-				expect(values).toHaveLength(1)
-				seriesCb()
-			}),
-			seriesCb => cache.del(testKey, seriesCb),
-			seriesCb => cache.get(testKey, (err, value) => {
-				expect(err).toBeNull()
-				expect(value).toBeNull()
-				seriesCb()
-			}),
-		], (err, results) => {
-			expect(err).toBeNull()
-			expect(fakeConsoleLog).toHaveBeenCalled()
+    // Mimic the basic test suite, with logging.
+    async.series([
+      seriesCb => cache.set(testKey, testValue, seriesCb),
+      seriesCb => cache.get(testKey, (err, value) => {
+        expect(err).toBeNull()
+        expect(value).toEqual(testValue)
+        seriesCb()
+      }),
+      seriesCb => cache.ttl(testKey, (err, value) => {
+        expect(err).toBeNull()
+        expect(value).toEqual(-1)
+        seriesCb()
+      }),
+      seriesCb => cache.keys((err, values) => {
+        expect(err).toBeNull()
+        expect(values).toHaveLength(1)
+        seriesCb()
+      }),
+      seriesCb => cache.del(testKey, seriesCb),
+      seriesCb => cache.get(testKey, (err, value) => {
+        expect(err).toBeNull()
+        expect(value).toBeNull()
+        seriesCb()
+      }),
+    ], (err, results) => {
+      expect(err).toBeNull()
+      expect(fakeConsoleLog).toHaveBeenCalled()
 
-			// Reset env vars
-			utils.setAllLogLevels(oldLogLevels)
-			if( mainOldLogLevel ) {
-				process.env.S3CACHE_LOGLEVEL = mainOldLogLevel
-			} else {
-				delete process.env.S3CACHE_LOGLEVEL
-			}
-			done()
-		})
-	})
+      // Reset env vars
+      utils.setAllLogLevels(oldLogLevels)
+      if( mainOldLogLevel ) {
+        process.env.S3CACHE_LOGLEVEL = mainOldLogLevel
+      } else {
+        delete process.env.S3CACHE_LOGLEVEL
+      }
+      done()
+    })
+  })
 })
 
 describe('test internal functions with alternate parameters', () => {
-	const cache = new S3Cache(keyParams)
+  const cache = new S3Cache(keyParams)
 
-	test('stringify complains when response is malformed', () => {
-		cache._stringifyResponse({})
-		expect(fakeConsoleWarn).toHaveBeenCalled()
-	})
+  test('stringify complains when response is malformed', () => {
+    cache._stringifyResponse({})
+    expect(fakeConsoleWarn).toHaveBeenCalled()
+  })
 
-	test('timestampToMoment can handle unix timestamp input (from mock)', () => {
-		// Doing this strips milliseconds, so we should too.
-		const now = moment().startOf('second')
-		const inputMoment = cache._timestampToMoment(now.unix())
-		expect(inputMoment.toString()).toEqual(now.toString())
-	})
+  test('timestampToMoment can handle unix timestamp input (from mock)', () => {
+    // Doing this strips milliseconds, so we should too.
+    const now = moment().startOf('second')
+    const inputMoment = cache._timestampToMoment(now.unix())
+    expect(inputMoment.toString()).toEqual(now.toString())
+  })
 
-	test('timestampToMoment can handle JS style dates (from real AWS)', () => {
-		// Doing this strips milliseconds, so we should too.
-		const now = moment().startOf('second')
-		const inputMoment = cache._timestampToMoment(now.toDate().toString())
-		expect(inputMoment.toString()).toEqual(now.toString())
-	})
+  test('timestampToMoment can handle JS style dates (from real AWS)', () => {
+    // Doing this strips milliseconds, so we should too.
+    const now = moment().startOf('second')
+    const inputMoment = cache._timestampToMoment(now.toDate().toString())
+    expect(inputMoment.toString()).toEqual(now.toString())
+  })
 
-	test('normalizeUrl can work without second parameter', () => {
-		const url = utils.getRandomUrl()
-		expect(cache._normalizeUrl(url)).toEqual(url.toLowerCase())
-	})
+  test('normalizeUrl can work without second parameter', () => {
+    const url = utils.getRandomUrl()
+    expect(cache._normalizeUrl(url)).toEqual(url.toLowerCase())
+  })
 
-	test('normalizePath can work without second parameter', () => {
-		const path = utils.getRandomPath()
-		expect(cache._normalizePath(path)).toEqual(path)
-	})
+  test('normalizePath can work without second parameter', () => {
+    const path = utils.getRandomPath()
+    expect(cache._normalizePath(path)).toEqual(path)
+  })
 
-	test('stringifyResponse handles strings and buffers', () => {
-		const string = random()
-		const bufferString = random()
-		const buffer = Buffer.from(bufferString)
-		expect(cache._stringifyResponse({Body: string})).toEqual(string)
-		expect(cache._stringifyResponse({Body: buffer})).toEqual(bufferString)
-		expect(cache._stringifyResponse({Body: buffer}, {stringifyResponse: false})).toEqual(buffer)
-	})
+  test('stringifyResponse handles strings and buffers', () => {
+    const string = random()
+    const bufferString = random()
+    const buffer = Buffer.from(bufferString)
+    expect(cache._stringifyResponse({Body: string})).toEqual(string)
+    expect(cache._stringifyResponse({Body: buffer})).toEqual(bufferString)
+    expect(cache._stringifyResponse({Body: buffer}, {stringifyResponse: false})).toEqual(buffer)
+  })
 })

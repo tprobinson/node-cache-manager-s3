@@ -1,6 +1,6 @@
 {
   "name": "cache-manager-s3",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Cache manager module for S3",
   "main": "src/index.js",
   "keywords": [
@@ -20,9 +20,10 @@
   "license": "MIT",
   "scripts": {
     "lint": "eslint src/ test/ __mocks__/",
-    "test": "yarn run lint; jest --maxWorkers=4",
+    "lintfix": "eslint --fix src/ test/ __mocks__/",
+    "test": "yarn run lint && jest --maxWorkers=4",
     "test:coveralls": "yarn run test --coverage --coverageReporters=text-lcov | yarn exec coveralls",
-    "test:real": "yarn run lint; env USE_REAL_AWS=true yarn run test --runInBand",
+    "test:real": "yarn run lint && env USE_REAL_AWS=true yarn run test --runInBand",
     "doc": "esdoc",
     "docdev": "esdoc && serve -s docs"
   },
