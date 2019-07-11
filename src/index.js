@@ -271,14 +271,16 @@ class S3Cache {
     }
 
     // Add a folder structure based on the hash.
-    const urlChunks = []
-    for( let depth = 0; depth < options.folderPathDepth; depth++ ) {
-      const begin = depth * options.folderPathChunkSize
-      const end = begin + options.folderPathChunkSize
-      urlChunks.push(key.slice(begin, end))
-    }
+    if( options.folderPathDepth !== 0 ) {
+        const urlChunks = []
+        for( let depth = 0; depth < options.folderPathDepth; depth++ ) {
+          const begin = depth * options.folderPathChunkSize
+          const end = begin + options.folderPathChunkSize
+          urlChunks.push(key.slice(begin, end))
+        }
 
-    key = urlChunks.join('/') + '/' + key
+        key = urlChunks.join('/') + '/' + key
+    }
 
     // Prefix it if desired
     if( options.pathPrefix !== '' ) {
