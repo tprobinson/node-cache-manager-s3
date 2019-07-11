@@ -130,17 +130,20 @@ class S3Cache {
       }
     }
 
-    validateOption('accessKey')
-    validateOption('secretKey')
     validateOption('bucket')
 
     // Translate passed in params to S3 constructor params.
     let constructorOptions = {
-      accessKeyId: this.options.accessKey,
-      secretAccessKey: this.options.secretKey,
       params: {
         Bucket: this.options.bucket,
       },
+    }
+    // Only set identity values if passed. Let AWS-sdk handle picking them up from the environment.
+    if ('accessKey' in this.options) {
+        constructorOptions.accessKeyId = this.options.accessKey;
+    }
+    if ('secretKey' in this.options) {
+        constructorOptions.secretAccessKey = this.options.secretKey;
     }
 
     // If s3Options is provided, merge it with our constructorOptions object and create S3 object
