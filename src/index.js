@@ -379,13 +379,13 @@ class S3Cache {
           // If we're being proactive, delete the object.
           if( currentOptions.proactiveExpiry ) {
             this._log.get.info(key, ' is expired, deleting it')
-            this.del(key, (err, result) => err ? waterCb(err, null) : waterCb(null, null))
+            this.del(key, (err, result) => err ? waterCb(err, undefined) : waterCb(null, undefined))
             return
           } else {
             this._log.get.info(key, ' is expired, ignoring result')
           }
 
-          waterCb(null, null)
+          waterCb(null, undefined)
           return
         }
 
@@ -395,7 +395,7 @@ class S3Cache {
     ], (err, result) => {
       if( err instanceof Error && err.statusCode === 404 ) {
         this._log.get.trace(key, ' not found according to s3' )
-        cb(null, null)
+        cb(null, undefined)
         return
       }
 
