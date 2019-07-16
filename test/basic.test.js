@@ -94,7 +94,7 @@ describe('basic function test', () => {
   test('fail to get string with different case', done => {
     cache.get(utils.randomizeCase(testKey), (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })
@@ -144,7 +144,7 @@ describe('basic function test', () => {
   test('fail to get deleted string', done => {
     cache.get(testKey, (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })

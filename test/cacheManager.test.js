@@ -42,7 +42,7 @@ describe('basic function test', () => {
     cache.get(id, function (err, result) {
       if( err ) { return cb(err) }
 
-      if( result !== null ) {
+      if( result !== undefined ) {
         return cb(null, result)
       }
 

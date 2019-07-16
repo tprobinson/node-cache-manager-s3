@@ -87,7 +87,7 @@ describe('key normalization as url', () => {
   test('fail to get same string with random case on url', done => {
     cache.get(utils.randomizeCase(testKey), (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })
@@ -119,7 +119,7 @@ describe('key normalization as url', () => {
   test('fail to get same string with random case on poorly formed url', done => {
     cache.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })
@@ -188,7 +188,7 @@ describe('key normalization as path', () => {
   test('fail to get same string with random case on path', done => {
     cache.get(utils.randomizeCase(testKey), (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })
@@ -208,7 +208,7 @@ describe('key normalization as path', () => {
   test('fail to get same string with random case on poorly formed path', done => {
     cache.get(utils.randomizeCase(testPoorlyFormedKey), (err, value) => {
       expect(err).toBeNull()
-      expect(value).toBeNull()
+      expect(value).toBeUndefined()
       done()
     })
   })
