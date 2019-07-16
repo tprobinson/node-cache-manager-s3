@@ -139,11 +139,11 @@ class S3Cache {
       },
     }
     // Only set identity values if passed. Let AWS-sdk handle picking them up from the environment.
-    if ('accessKey' in this.options) {
-        constructorOptions.accessKeyId = this.options.accessKey;
-    }
-    if ('secretKey' in this.options) {
-        constructorOptions.secretAccessKey = this.options.secretKey;
+    if( 'accessKey' in this.options || 'secretKey' in this.options ) {
+      validateOption('accessKey')
+      validateOption('secretKey')
+      constructorOptions.accessKeyId = this.options.accessKey
+      constructorOptions.secretAccessKey = this.options.secretKey
     }
 
     // If s3Options is provided, merge it with our constructorOptions object and create S3 object
