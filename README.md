@@ -50,7 +50,6 @@ const s3CacheStore = new S3Cache({
 
 const s3Cache = cacheManager.caching({
   store: s3CacheStore,
-  isCacheableValue: value => value !== undefined && value !== null,
 })
 
 s3Cache.set('foo', 'bar', {ttl: 360}, (err) => {
