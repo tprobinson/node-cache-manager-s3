@@ -1,7 +1,7 @@
 /** @module S3Cache */
 const async = require('async')
 const path = require('path')
-const url = require('url')
+const Url = require('url-parse')
 const querystring = require('querystring')
 const checksum = require('checksum')
 const moment = require('moment')
@@ -133,7 +133,7 @@ class S3Cache {
     validateOption('bucket')
 
     // Translate passed in params to S3 constructor params.
-    let constructorOptions = {
+    const constructorOptions = {
       params: {
         Bucket: this.options.bucket,
       },
@@ -180,7 +180,7 @@ class S3Cache {
     this._log = ['get', 'set', 'keys', 'head', 'ttl', 'del', 'reset', 'normalizePath', 'timestampToMoment', 'stringifyResponse']
       .reduce((memo, type) => {
         // Create the logger
-        Object.assign(memo, {[type]: log.getLogger(type)})
+        Object.assign(memo, { [type]: log.getLogger(type) })
 
         // Look for an environment variable with this logger's name to set level
         if( `S3CACHE_${type.toUpperCase()}_LOGLEVEL` in process.env && process.env[`S3CACHE_${type.toUpperCase()}_LOGLEVEL`] ) {
@@ -201,21 +201,20 @@ class S3Cache {
    * @return {string}                        - The input string, normalized.
    */
   _normalizeUrl(str, options = this.options) {
-    const request = url.parse(str)
+    const request = new Url(str)
 
     if( options.normalizeUrl ) {
       if( request.search !== null ) {
-        // Sort query parameters -- slice off the leading ?
-        const params = querystring.parse(request.search.slice(1))
-
         // Sort param keys
-        request.search = Object.keys(params).sort().map(key =>
-          querystring.stringify({[key]: params[key]})
+        const sanitizedQuery = Object.keys(request.query).sort().map(key =>
+          querystring.stringify({ [key]: request.query[key] })
         ).join('&')
+
+        request.set('search', sanitizedQuery)
       }
     }
 
-    return url.format(request)
+    return request.toString()
   }
 
   /**
@@ -681,13 +680,13 @@ class S3Cache {
   reset(cb) {
     this._log.reset.warn('Resetting bucket!')
     async.waterfall([
-      waterCb => this.keys({dontConcatPages: true}, waterCb),
+      waterCb => this.keys({ dontConcatPages: true }, waterCb),
       (results, waterCb) => async.mapLimit(results, 2, (dataset, mapCb) => {
         if( dataset.length === 0 ) { mapCb(); return }
         this.s3.deleteObjects({
           Delete: {
             // deleteObjects does not accept any parameters except key and version
-            Objects: dataset.map(({Key, VersionId}) => ({Key, VersionId})),
+            Objects: dataset.map(({ Key, VersionId }) => ({ Key, VersionId })),
           },
         }, mapCb)
       }, waterCb)

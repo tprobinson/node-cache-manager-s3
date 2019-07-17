@@ -94,7 +94,7 @@ class S3 {
     responseObject.Body = Buffer.from(responseObject.Body)
 
     cb(err, responseObject)
-    return {send: () => {}}
+    return { send: () => {} }
   }
 
   putObject(inputParams = {}, cb) {
@@ -129,7 +129,7 @@ class S3 {
 
     this.cache[params.Bucket][params.Key] = params
     cb(err, null)
-    return {send: () => {}}
+    return { send: () => {} }
   }
 
   listObjectsV2(inputParams = {}, cb) {
@@ -143,7 +143,7 @@ class S3 {
     this._log('listObjects', params)
 
     if( !(params.Bucket in this.cache) ) {
-      cb(null, {Contents: []})
+      cb(null, { Contents: [] })
       return
     }
 
@@ -159,7 +159,7 @@ class S3 {
       results = results.filter(x => x.Key.startsWith(params.Prefix))
     }
 
-    const returnedStuff = {Contents: results}
+    const returnedStuff = { Contents: results }
 
     // Slice the array if we're "continuing"
     if( results.length > 1000 ) {
@@ -168,7 +168,7 @@ class S3 {
         sliceBegin = params.ContinuationToken
       }
 
-      let sliceEnd = Math.min(sliceBegin + 1000, results.length)
+      const sliceEnd = Math.min(sliceBegin + 1000, results.length)
       returnedStuff.Contents = results.slice(sliceBegin, sliceEnd)
       returnedStuff.NextContinuationToken = sliceEnd
 
@@ -178,7 +178,7 @@ class S3 {
     }
 
     cb(null, returnedStuff)
-    return {send: () => {}}
+    return { send: () => {} }
   }
 
   deleteObject(inputParams = {}, cb) {
@@ -211,7 +211,7 @@ class S3 {
     }
 
     cb(err, {})
-    return {send: () => {}}
+    return { send: () => {} }
   }
 
   deleteObjects(inputParams = {}, cb) {
@@ -248,7 +248,7 @@ class S3 {
     }
 
     cb(err, {})
-    return {send: () => {}}
+    return { send: () => {} }
   }
 
   headObject(inputParams = {}, cb) {
@@ -269,12 +269,12 @@ class S3 {
 
       cb(err, result)
     })
-    return {send: () => {}}
+    return { send: () => {} }
   }
 }
 
 if( process.env.USE_REAL_AWS && (process.env.USE_REAL_AWS === 'true' || process.env.USE_REAL_AWS === true) ) {
   module.exports = require.requireActual('aws-sdk')
 } else {
-  module.exports = {S3}
+  module.exports = { S3 }
 }

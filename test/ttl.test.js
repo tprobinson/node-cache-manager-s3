@@ -77,7 +77,7 @@ describe('get/set/del with ttl', () => {
   })
 
   test('fail to get expired string proactively', done => {
-    cache.get(testKey, {proactiveExpiry: true}, (err, value) => {
+    cache.get(testKey, { proactiveExpiry: true }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toBeUndefined()
       done()

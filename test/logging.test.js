@@ -16,7 +16,7 @@ jest.spyOn(global.console, 'error').mockImplementation(fakeConsoleError)
 
 describe('logging', () => {
   test('debug logging with option', done => {
-    const cache = new S3Cache(Object.assign({}, keyParams, {logLevel: 'TRACE'}))
+    const cache = new S3Cache(Object.assign({}, keyParams, { logLevel: 'TRACE' }))
 
     cache.keys(() => {
       expect(fakeConsoleLog).toHaveBeenCalled()
@@ -117,8 +117,8 @@ describe('test internal functions with alternate parameters', () => {
     const string = random()
     const bufferString = random()
     const buffer = Buffer.from(bufferString)
-    expect(cache._stringifyResponse({Body: string})).toEqual(string)
-    expect(cache._stringifyResponse({Body: buffer})).toEqual(bufferString)
-    expect(cache._stringifyResponse({Body: buffer}, {stringifyResponse: false})).toEqual(buffer)
+    expect(cache._stringifyResponse({ Body: string })).toEqual(string)
+    expect(cache._stringifyResponse({ Body: buffer })).toEqual(bufferString)
+    expect(cache._stringifyResponse({ Body: buffer }, { stringifyResponse: false })).toEqual(buffer)
   })
 })

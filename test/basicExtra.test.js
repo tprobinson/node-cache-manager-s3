@@ -51,7 +51,7 @@ describe('basic function test with options overrides', () => {
   const testValue = random()
   const headerName = 'ContentType'
   const headerValue = 'text/plain'
-  const headers = {s3Options: {[headerName]: headerValue}}
+  const headers = { s3Options: { [headerName]: headerValue } }
 
   beforeAll(done => cache.reset(done))
   afterAll(done => cache.reset(done))
@@ -73,7 +73,7 @@ describe('basic function test with options overrides', () => {
   })
 
   test('get string with options', done => {
-    cache.get(testKey, {s3Options: {IfModifiedSince: 0}}, (err, value) => {
+    cache.get(testKey, { s3Options: { IfModifiedSince: 0 } }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toEqual(testValue)
       done()
@@ -97,7 +97,7 @@ describe('basic function test with options overrides', () => {
   })
 
   test('list keys with options', done => {
-    cache.keys({s3Options: {MaxKeys: 1000}}, (err, values) => {
+    cache.keys({ s3Options: { MaxKeys: 1000 } }, (err, values) => {
       expect(err).toBeNull()
       expect(values).toHaveLength(1)
       done()
@@ -111,7 +111,7 @@ describe('basic function test with options overrides', () => {
   })
 
   test('get string with no checksum on key', done => {
-    cache.get(testKey, {checksumAlgorithm: 'none'}, (err, value) => {
+    cache.get(testKey, { checksumAlgorithm: 'none' }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toEqual(testValue)
       done()
@@ -134,7 +134,7 @@ describe('basic function test with options overrides', () => {
   })
 
   test('get string with base64 checksum', done => {
-    cache.get(testKey, {checksumAlgorithm: 'none', checksumEncoding: 'base64'}, (err, value) => {
+    cache.get(testKey, { checksumAlgorithm: 'none', checksumEncoding: 'base64' }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toEqual(testValue)
       done()
@@ -150,14 +150,14 @@ describe('basic function test with options overrides', () => {
   })
 
   test('fail to get keys when API error triggered.', done => {
-    cache.keys('', {s3Options: {PleaseBreakApi: 1}}, (err, values) => {
+    cache.keys('', { s3Options: { PleaseBreakApi: 1 } }, (err, values) => {
       expect(err).toEqual(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"))
       done()
     })
   })
 
   test('get key metadata', done => {
-    cache.head(testKey, {s3Options: {IfModifiedSince: 0}}, (err, value) => {
+    cache.head(testKey, { s3Options: { IfModifiedSince: 0 } }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toHaveProperty(headerName, headerValue)
       done()
@@ -174,7 +174,7 @@ describe('basic function test with options overrides', () => {
 
   test('delete string', done => {
     // Force this bucket option so we test the s3Option assign code
-    cache.del(testKey, {s3Options: {Bucket: keyParams.bucket}}, done)
+    cache.del(testKey, { s3Options: { Bucket: keyParams.bucket } }, done)
   })
 })
 

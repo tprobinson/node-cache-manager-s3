@@ -121,7 +121,7 @@ module.exports = {
   },
 
   getRandomPath(poorlyFormed = false) {
-    const copyOfOptions = Object.assign({}, largeRandomOptions, {exactly: 4})
+    const copyOfOptions = Object.assign({}, largeRandomOptions, { exactly: 4 })
     delete copyOfOptions.join
     return random(copyOfOptions)
       .concat(

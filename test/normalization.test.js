@@ -47,11 +47,11 @@ describe('key normalization as url', () => {
 
   // Simulate storing HTML for a URL request
   const testKey = utils.getRandomUrl()
-  const testValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
+  const testValue = random(Object.assign({}, utils.largeRandomOptions, { exactly: 20 }))
   const testPoorlyFormedKey = utils.getRandomUrl(true)
-  const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
+  const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, { exactly: 20 }))
   const testBoringKey = 'http://nowhere.com'
-  const testBoringValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
+  const testBoringValue = random(Object.assign({}, utils.largeRandomOptions, { exactly: 20 }))
 
   beforeAll(done => cache.reset(done))
   afterAll(done => cache.reset(done))
@@ -73,11 +73,11 @@ describe('key normalization as url', () => {
   })
 
   test('set string with url without normalization', done => {
-    cache.set(testKey, testValue, {normalizeUrl: false}, done)
+    cache.set(testKey, testValue, { normalizeUrl: false }, done)
   })
 
   test('get string with url without normalization', done => {
-    cache.get(testKey, {normalizeUrl: false}, (err, value) => {
+    cache.get(testKey, { normalizeUrl: false }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toEqual(testValue)
       done()
@@ -150,9 +150,9 @@ describe('key normalization as path', () => {
 
   // Simulate storing file content for a file path
   const testKey = utils.getRandomPath()
-  const testValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
+  const testValue = random(Object.assign({}, utils.largeRandomOptions, { exactly: 20 }))
   const testPoorlyFormedKey = utils.getRandomPath(true)
-  const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, {exactly: 20}))
+  const testPoorlyFormedValue = random(Object.assign({}, utils.largeRandomOptions, { exactly: 20 }))
 
   beforeAll(done => cache.reset(done))
   afterAll(done => cache.reset(done))
@@ -174,11 +174,11 @@ describe('key normalization as path', () => {
   })
 
   test('set string with path without normalization', done => {
-    cache.set(testKey, testValue, {normalizePath: false}, done)
+    cache.set(testKey, testValue, { normalizePath: false }, done)
   })
 
   test('get string with path without normalization', done => {
-    cache.get(testKey, {normalizePath: false}, (err, value) => {
+    cache.get(testKey, { normalizePath: false }, (err, value) => {
       expect(err).toBeNull()
       expect(value).toEqual(testValue)
       done()

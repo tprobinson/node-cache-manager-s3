@@ -15,7 +15,7 @@ describe('class construction options', () => {
   test('can add options to constructor', () => {
     const region = 'us-west-2'
     const cache = new S3Cache(Object.assign({}, keyParams, {
-      s3Options: {region}
+      s3Options: { region }
     }))
 
     expect(cache).toHaveProperty('s3.config.region', region)
@@ -25,20 +25,20 @@ describe('class construction options', () => {
     const headerKey = 'ContentType'
     const headerValue = 'text/plain'
     const cache = new S3Cache(Object.assign({}, keyParams, {
-      s3Options: {params: {[headerKey]: headerValue}}
+      s3Options: { params: { [headerKey]: headerValue } }
     }))
 
     expect(cache).toHaveProperty(`s3.config.params.${headerKey}`, headerValue)
   })
 
   test('construction fails without required parameters', () => {
-    expect(() => new S3Cache({accessKey: 'a', secretKey: 'b'})).toThrow()
-    expect(() => new S3Cache({secretKey: 'b', 'bucket': 'c'})).toThrow()
-    expect(() => new S3Cache({'bucket': 'c', accessKey: 'a'})).toThrow()
+    expect(() => new S3Cache({ accessKey: 'a', secretKey: 'b' })).toThrow()
+    expect(() => new S3Cache({ secretKey: 'b', bucket: 'c' })).toThrow()
+    expect(() => new S3Cache({ bucket: 'c', accessKey: 'a' })).toThrow()
   })
 
   test('construction fails with incorrect parameters', () => {
-    expect(() => new S3Cache(Object.assign({}, keyParams, {s3Options: 2}))).toThrow()
+    expect(() => new S3Cache(Object.assign({}, keyParams, { s3Options: 2 }))).toThrow()
   })
 })
 
@@ -56,7 +56,7 @@ describe('basic function test', () => {
   const largeCountOfKeys = (Math.random() + 1) * 100 + 1000
   const largeListOfKeys = []
   for( let i = largeCountOfKeys; i > 0; i-- ) {
-    largeListOfKeys.push({key: random(utils.largeRandomOptions), value: random()})
+    largeListOfKeys.push({ key: random(utils.largeRandomOptions), value: random() })
   }
 
   beforeAll(done => cache.reset(done))
@@ -170,7 +170,7 @@ describe('basic function test', () => {
     async.series([
       seriesCb => cache.set(testBinaryKey, testBinaryValue, seriesCb),
       seriesCb => cache.get(testBinaryKey, seriesCb),
-      seriesCb => cache.get(testBinaryKey, {stringifyResponses: false}, seriesCb),
+      seriesCb => cache.get(testBinaryKey, { stringifyResponses: false }, seriesCb),
     ], (err, values) => {
       expect(err).toBeNull()
       expect(values[1]).not.toEqual(testBinaryValue)
