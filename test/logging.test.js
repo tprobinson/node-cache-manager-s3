@@ -62,7 +62,7 @@ describe('logging', () => {
       seriesCb => cache.del(testKey, seriesCb),
       seriesCb => cache.get(testKey, (err, value) => {
         expect(err).toBeNull()
-        expect(value).toBeNull()
+        expect(value).toBeUndefined()
         seriesCb()
       }),
     ], (err, results) => {
