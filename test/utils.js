@@ -1,5 +1,7 @@
 const url = require('url')
+const { promisify } = require('util')
 const random = require('random-words')
+const S3Cache = require('../src/index.js')
 
 const camelCase = (word, index) =>
   index !== 0
@@ -130,5 +132,17 @@ module.exports = {
           : ['file']
       )
       .join('/')
+  },
+
+  getAsyncCache(...args) {
+    const cache = new S3Cache(...args)
+
+    // Make some async methods to make Jest happy.
+    const asyncifyMethods = ['get', 'set', 'ttl', 'del', 'keys', 'head', 'reset']
+    asyncifyMethods.forEach(key => {
+      cache[`${key}Async`] = promisify(cache[key])
+    })
+
+    return cache
   },
 }

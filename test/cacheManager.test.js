@@ -1,25 +1,25 @@
 const cacheManager = require('cache-manager')
 const S3Cache = require('../src/index.js')
+const { promisify } = require('util')
 const utils = require('./utils')
-const async = require('async')
 
 const keyParams = utils.constructorParams
 
 expect.extend({ toBeInRange: utils.toBeInRange })
 
-let cacheFuncInput = 2
-function cacheMe (input, cb) {
-  cb(null, `${input * cacheFuncInput}`)
-
+let cacheFuncInput = 1
+function cacheMe (input) {
   // Try to cause a little havoc, make sure the output is cached.
   cacheFuncInput += 1
+  console.log(cacheFuncInput, input)
+  return `${input * cacheFuncInput}`
 }
 
-beforeEach(() => { cacheFuncInput = 2 })
+beforeEach(() => { cacheFuncInput = 1 })
 
 describe('cache-manager construction options', () => {
   test('can instantiate class', () => {
-    const s3Cache = new S3Cache(keyParams)
+    const s3Cache = utils.getAsyncCache(keyParams)
     const cache = cacheManager.caching({
       store: s3Cache
     })
@@ -29,28 +29,27 @@ describe('cache-manager construction options', () => {
 })
 
 describe('basic function test', () => {
-  const s3Cache = new S3Cache(keyParams)
+  const s3Cache = utils.getAsyncCache(keyParams)
   const cache = cacheManager.caching({
     store: s3Cache
   })
-  // const crappedFunc = (input, cb) =>
-  //   cache.wrap(input, cacheCallback => {
-  //     cacheMe(input, cacheCallback)
-  //   }, cb)
 
-  const wrappedFunc = (id, cb) => {
-    cache.get(id, function (err, result) {
-      if( err ) { return cb(err) }
+  // Make some async methods to make Jest happy.
+  const asyncifyMethods = ['get', 'set', 'reset']
+  asyncifyMethods.forEach(key => {
+    cache[`${key}Async`] = promisify(cache[key])
+  })
 
-      if( result !== undefined ) {
-        return cb(null, result)
-      }
+  const wrappedFunc = async id => {
+    const result = await cache.getAsync(id)
 
-      cacheMe(id, function (cacheErr, cacheResult) {
-        if( cacheErr ) { return cb(cacheErr) }
-        cache.set(id, cacheResult, cb(null, cacheResult))
-      })
-    })
+    if( result ) {
+      return result
+    }
+
+    const cacheResult = cacheMe(id)
+    await cache.setAsync(id, cacheResult)
+    return cacheResult
   }
 
   // afterAll(done => cache.reset(done))
@@ -60,25 +59,21 @@ describe('basic function test', () => {
   })
 
   // Since the previous test doesn't actually manipulate buckets, do it here as a test.
-  test('reset cache', done => {
-    cache.reset(done)
+  test('reset cache', async () => {
+    await cache.resetAsync()
   })
 
-  test('try function out', done => {
-    const s3Sleep = 100
-    async.series([
-      // Sleeps are to allow S3 time to settle.
-      seriesCb => wrappedFunc('2', seriesCb),
-      seriesCb => setTimeout(seriesCb, s3Sleep),
-      seriesCb => wrappedFunc('2', seriesCb),
-      seriesCb => setTimeout(seriesCb, s3Sleep),
-      seriesCb => wrappedFunc('2', seriesCb),
-    ], (err, results) => {
-      expect(err).toBeNull()
-      expect(results[0]).toEqual('4')
-      expect(results[2]).toEqual('4')
-      expect(results[4]).toEqual('4')
-      done()
-    })
+  test('try function out', async () => {
+    const pause = () => new Promise(resolve => setTimeout(resolve, 100))
+
+    const resultOne = await wrappedFunc('2')
+    await pause()
+    const resultTwo = await wrappedFunc('2')
+    await pause()
+    const resultThree = await wrappedFunc('2')
+
+    expect(resultOne).toEqual('4')
+    expect(resultTwo).toEqual('4')
+    expect(resultThree).toEqual('4')
   })
 })

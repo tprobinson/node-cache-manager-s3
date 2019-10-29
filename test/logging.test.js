@@ -1,6 +1,5 @@
 const S3Cache = require('../src/index.js')
 const utils = require('./utils')
-const async = require('async')
 const moment = require('moment')
 const random = require('random-words')
 
@@ -15,16 +14,14 @@ jest.spyOn(global.console, 'warn').mockImplementation(fakeConsoleWarn)
 jest.spyOn(global.console, 'error').mockImplementation(fakeConsoleError)
 
 describe('logging', () => {
-  test('debug logging with option', done => {
-    const cache = new S3Cache(Object.assign({}, keyParams, { logLevel: 'TRACE' }))
+  test('debug logging with option', async () => {
+    const cache = utils.getAsyncCache(Object.assign({}, keyParams, { logLevel: 'TRACE' }))
 
-    cache.keys(() => {
-      expect(fakeConsoleLog).toHaveBeenCalled()
-      done()
-    })
+    await cache.keysAsync()
+    expect(fakeConsoleLog).toHaveBeenCalled()
   })
 
-  test('debug logging with env var', done => {
+  test('debug logging with env var', async () => {
     const testKey = random()
     const testValue = random()
 
@@ -36,48 +33,36 @@ describe('logging', () => {
     const mainOldLogLevel = process.env.S3CACHE_LOGLEVEL
     process.env.S3CACHE_LOGLEVEL = logLevel
 
-    const cache = new S3Cache(keyParams)
+    const cache = utils.getAsyncCache(keyParams)
 
-    beforeAll(done => cache.reset(done))
-    afterAll(done => cache.reset(done))
+    beforeAll(() => cache.resetAsync())
+    afterAll(() => cache.resetAsync())
 
     // Mimic the basic test suite, with logging.
-    async.series([
-      seriesCb => cache.set(testKey, testValue, seriesCb),
-      seriesCb => cache.get(testKey, (err, value) => {
-        expect(err).toBeNull()
-        expect(value).toEqual(testValue)
-        seriesCb()
-      }),
-      seriesCb => cache.ttl(testKey, (err, value) => {
-        expect(err).toBeNull()
-        expect(value).toEqual(-1)
-        seriesCb()
-      }),
-      seriesCb => cache.keys((err, values) => {
-        expect(err).toBeNull()
-        expect(values).toHaveLength(1)
-        seriesCb()
-      }),
-      seriesCb => cache.del(testKey, seriesCb),
-      seriesCb => cache.get(testKey, (err, value) => {
-        expect(err).toBeNull()
-        expect(value).toBeUndefined()
-        seriesCb()
-      }),
-    ], (err, results) => {
-      expect(err).toBeNull()
-      expect(fakeConsoleLog).toHaveBeenCalled()
+    let value
+    await cache.setAsync(testKey, testValue)
+    value = await cache.getAsync(testKey)
+    expect(value).toEqual(testValue)
 
-      // Reset env vars
-      utils.setAllLogLevels(oldLogLevels)
-      if( mainOldLogLevel ) {
-        process.env.S3CACHE_LOGLEVEL = mainOldLogLevel
-      } else {
-        delete process.env.S3CACHE_LOGLEVEL
-      }
-      done()
-    })
+    value = await cache.ttlAsync(testKey)
+    expect(value).toEqual(-1)
+
+    value = await cache.keysAsync()
+    expect(value).toHaveLength(1)
+
+    await cache.delAsync(testKey)
+    value = await cache.getAsync(testKey)
+    expect(value).toBeUndefined()
+
+    expect(fakeConsoleLog).toHaveBeenCalled()
+
+    // Reset env vars
+    utils.setAllLogLevels(oldLogLevels)
+    if( mainOldLogLevel ) {
+      process.env.S3CACHE_LOGLEVEL = mainOldLogLevel
+    } else {
+      delete process.env.S3CACHE_LOGLEVEL
+    }
   })
 })
 

@@ -1,10 +1,9 @@
 const S3Cache = require('../src/index.js')
 const utils = require('./utils')
 const random = require('random-words')
-const async = require('async')
 
 const keyParams = utils.constructorParams
-const cache = new S3Cache(keyParams)
+const cache = utils.getAsyncCache(keyParams)
 
 describe('class construction options', () => {
   test('can instantiate class', () => {
@@ -59,73 +58,56 @@ describe('basic function test', () => {
     largeListOfKeys.push({ key: random(utils.largeRandomOptions), value: random() })
   }
 
-  beforeAll(done => cache.reset(done))
-  afterAll(done => cache.reset(done))
+  beforeAll(() => cache.resetAsync())
+  afterAll(() => cache.resetAsync())
 
   afterEach(() => {
     utils.debugLog(JSON.stringify(cache.s3.cache))
   })
 
   // Since the previous test doesn't actually manipulate buckets, do it here as a test.
-  test('reset cache', done => {
-    cache.reset(done)
+  test('reset cache', async () => {
+    await cache.resetAsync()
   })
 
-  test('set string', done => {
-    cache.set(testKey, testValue, done)
+  test('set string', async () => {
+    await cache.setAsync(testKey, testValue)
   })
 
-  test('get string', done => {
-    cache.get(testKey, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(testValue)
-      done()
-    })
+  test('get string', async () => {
+    const value = await cache.getAsync(testKey)
+    expect(value).toEqual(testValue)
   })
 
-  test('get key with no TTL', done => {
-    cache.ttl(testKey, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(-1)
-      done()
-    })
+  test('get key with no TTL', async () => {
+    const value = await cache.ttlAsync(testKey)
+    expect(value).toEqual(-1)
   })
 
-  test('fail to get string with different case', done => {
-    cache.get(utils.randomizeCase(testKey), (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toBeUndefined()
-      done()
-    })
+  test('fail to get string with different case', async () => {
+    const value = await cache.getAsync(utils.randomizeCase(testKey))
+    expect(value).toBeUndefined()
   })
 
-  test('list keys', done => {
-    cache.keys((err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(1)
-      done()
-    })
+  test('list keys', async () => {
+    const values = await cache.keysAsync()
+    expect(values).toHaveLength(1)
   })
 
-  test('list keys with empty prefix', done => {
-    cache.keys('', (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(1)
-      done()
-    })
+  test('list keys with empty prefix', async () => {
+    const values = await cache.keysAsync('')
+    expect(values).toHaveLength(1)
   })
 
-  const setManyKeys = done => {
-    async.each(largeListOfKeys, (item, cb) => cache.set(item.key, item.value, cb), done)
+  const setManyKeys = () => {
+    const allSets = largeListOfKeys.map(item => cache.setAsync(item.key, item.value))
+    return Promise.all(allSets)
   }
 
-  const getManyKeys = done => {
-    cache.keys((err, values) => {
-      expect(err).toBeNull()
-      // + 1 for the keys we've set already
-      expect(values).toHaveLength(largeListOfKeys.length + 1)
-      done()
-    })
+  const getManyKeys = async () => {
+    const values = await cache.keysAsync()
+    // + 1 for the keys we've set already
+    expect(values).toHaveLength(largeListOfKeys.length + 1)
   }
 
   // Skip these if we're using real AWS, since they're a lot of load.
@@ -137,45 +119,32 @@ describe('basic function test', () => {
     test('list more than 1000 keys', getManyKeys)
   }
 
-  test('delete string', done => {
-    cache.del(testKey, done)
+  test('delete string', async () => {
+    await cache.delAsync(testKey)
   })
 
-  test('fail to get deleted string', done => {
-    cache.get(testKey, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toBeUndefined()
-      done()
-    })
+  test('fail to get deleted string', async () => {
+    const value = await cache.getAsync(testKey)
+    expect(value).toBeUndefined()
   })
 
-  test('error when get/set with key/value as non-string', done => {
+  test('error when get/set with key/value as non-string', async () => {
     expect(() => cache.get(1)).toThrow()
     expect(() => cache.set(1, 2)).toThrow()
-    done()
   })
 
-  test('unicode string safety', done => {
-    async.series([
-      seriesCb => cache.set(testUnicodeKey, testUnicodeValue, seriesCb),
-      seriesCb => cache.get(testUnicodeKey, seriesCb),
-    ], (err, values) => {
-      expect(err).toBeNull()
-      expect(values[1]).toEqual(testUnicodeValue)
-      done()
-    })
+  test('unicode string safety', async () => {
+    await cache.setAsync(testUnicodeKey, testUnicodeValue)
+    const value = await cache.getAsync(testUnicodeKey)
+    expect(value).toEqual(testUnicodeValue)
   })
 
-  test('binary data safety', done => {
-    async.series([
-      seriesCb => cache.set(testBinaryKey, testBinaryValue, seriesCb),
-      seriesCb => cache.get(testBinaryKey, seriesCb),
-      seriesCb => cache.get(testBinaryKey, { stringifyResponses: false }, seriesCb),
-    ], (err, values) => {
-      expect(err).toBeNull()
-      expect(values[1]).not.toEqual(testBinaryValue)
-      expect(values[2]).toEqual(testBinaryValue)
-      done()
-    })
+  test('binary data safety', async () => {
+    await cache.setAsync(testBinaryKey, testBinaryValue)
+    const badValue = await cache.getAsync(testBinaryKey)
+    const value = await cache.getAsync(testBinaryKey, { stringifyResponses: false })
+
+    expect(badValue).not.toEqual(testBinaryValue)
+    expect(value).toEqual(testBinaryValue)
   })
 })

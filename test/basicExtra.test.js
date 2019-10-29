@@ -1,10 +1,8 @@
-const S3Cache = require('../src/index.js')
 const utils = require('./utils')
 const random = require('random-words')
-const async = require('async')
 
 const keyParams = utils.constructorParams
-const cache = new S3Cache(keyParams)
+const cache = utils.getAsyncCache(keyParams)
 
 class UnexpectedParameter extends Error {}
 
@@ -14,35 +12,35 @@ describe('basic function test without callbacks', () => {
   const testValue = random()
   const testValue2 = random()
 
-  beforeAll(done => cache.reset(done))
-  afterAll(done => cache.reset(done))
+  beforeAll(() => cache.resetAsync())
+  afterAll(() => cache.resetAsync())
 
   afterEach(() => {
     utils.debugLog(JSON.stringify(cache.s3.cache))
   })
 
-  test('set string', () => {
-    cache.set(testKey, testValue)
+  test('set string', async () => {
+    await cache.setAsync(testKey, testValue)
   })
 
-  test('set string with options', () => {
-    cache.set(testKey2, testValue2, {})
+  test('set string with options', async () => {
+    await cache.setAsync(testKey2, testValue2, {})
   })
 
-  test('get string', () => {
-    cache.get(testKey)
+  test('get string', async () => {
+    await cache.getAsync(testKey)
   })
 
-  test('get string with options', () => {
-    cache.get(testKey2, {})
+  test('get string with options', async () => {
+    await cache.getAsync(testKey2, {})
   })
 
-  test('delete string', () => {
-    cache.del(testKey)
+  test('delete string', async () => {
+    await cache.delAsync(testKey)
   })
 
-  test('delete string with options', () => {
-    cache.del(testKey2, {})
+  test('delete string with options', async () => {
+    await cache.delAsync(testKey2, {})
   })
 })
 
@@ -53,134 +51,98 @@ describe('basic function test with options overrides', () => {
   const headerValue = 'text/plain'
   const headers = { s3Options: { [headerName]: headerValue } }
 
-  beforeAll(done => cache.reset(done))
-  afterAll(done => cache.reset(done))
+  beforeAll(() => cache.resetAsync())
+  afterAll(() => cache.resetAsync())
 
   afterEach(() => {
     utils.debugLog(JSON.stringify(cache.s3.cache))
   })
 
-  test('set string', done => {
-    cache.set(testKey, testValue, headers, done)
+  test('set string', async () => {
+    await cache.setAsync(testKey, testValue, headers)
   })
 
-  test('get string', done => {
-    cache.get(testKey, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(testValue)
-      done()
-    })
+  test('get string', async () => {
+    const value = await cache.getAsync(testKey)
+    expect(value).toEqual(testValue)
   })
 
-  test('get string with options', done => {
-    cache.get(testKey, { s3Options: { IfModifiedSince: 0 } }, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(testValue)
-      done()
-    })
+  test('get string with options', async () => {
+    const value = await cache.getAsync(testKey, { s3Options: { IfModifiedSince: 0 } })
+    expect(value).toEqual(testValue)
   })
 
-  test('list keys', done => {
-    cache.keys({}, (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(1)
-      done()
-    })
+  test('list keys', async () => {
+    const values = await cache.keysAsync({})
+    expect(values).toHaveLength(1)
   })
 
-  test('list keys with prefix', done => {
-    cache.keys('', (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(1)
-      done()
-    })
+  test('list keys with prefix', async () => {
+    const values = await cache.keysAsync('')
+    expect(values).toHaveLength(1)
   })
 
-  test('list keys with options', done => {
-    cache.keys({ s3Options: { MaxKeys: 1000 } }, (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(1)
-      done()
-    })
+  test('list keys with options', async () => {
+    const values = await cache.keysAsync({ s3Options: { MaxKeys: 1000 } })
+    expect(values).toHaveLength(1)
   })
 
-  test('set string with no checksum on key', done => {
-    cache.set(testKey, testValue, Object.assign({}, headers, {
+  test('set string with no checksum on key', async () => {
+    await cache.setAsync(testKey, testValue, Object.assign({}, headers, {
       checksumAlgorithm: 'none',
-    }), done)
+    }))
   })
 
-  test('get string with no checksum on key', done => {
-    cache.get(testKey, { checksumAlgorithm: 'none' }, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(testValue)
-      done()
-    })
+  test('get string with no checksum on key', async () => {
+    const value = await cache.getAsync(testKey, { checksumAlgorithm: 'none' })
+    expect(value).toEqual(testValue)
   })
 
-  test('no-checksum set should produce separate cache entry', done => {
-    cache.keys({}, (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(2)
-      done()
-    })
+  test('no-checksum set should produce separate cache entry', async () => {
+    const values = await cache.keysAsync({})
+    expect(values).toHaveLength(2)
   })
 
-  test('set string with base64 checksum', done => {
-    cache.set(testKey, testValue, Object.assign({}, headers, {
+  test('set string with base64 checksum', async () => {
+    await cache.setAsync(testKey, testValue, Object.assign({}, headers, {
       checksumAlgorithm: 'none',
       checksumEncoding: 'base64',
-    }), done)
+    }))
   })
 
-  test('get string with base64 checksum', done => {
-    cache.get(testKey, { checksumAlgorithm: 'none', checksumEncoding: 'base64' }, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(testValue)
-      done()
-    })
+  test('get string with base64 checksum', async () => {
+    const value = await cache.getAsync(testKey, { checksumAlgorithm: 'none', checksumEncoding: 'base64' })
+    expect(value).toEqual(testValue)
   })
 
-  test('base64-checksum set should produce separate cache entry', done => {
-    cache.keys({}, (err, values) => {
-      expect(err).toBeNull()
-      expect(values).toHaveLength(3)
-      done()
-    })
+  test('base64-checksum set should produce separate cache entry', async () => {
+    const values = await cache.keysAsync({})
+    expect(values).toHaveLength(3)
   })
 
-  test('fail to get keys when API error triggered.', done => {
-    cache.keys('', { s3Options: { PleaseBreakApi: 1 } }, (err, values) => {
-      expect(err).toEqual(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"))
-      done()
-    })
+  test('fail to get keys when API error triggered.', async () => {
+    await expect(cache.keysAsync('', { s3Options: { PleaseBreakApi: 1 } })).rejects.toThrow(new UnexpectedParameter("Unexpected key 'PleaseBreakApi' found in params"))
   })
 
-  test('get key metadata', done => {
-    cache.head(testKey, { s3Options: { IfModifiedSince: 0 } }, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toHaveProperty(headerName, headerValue)
-      done()
-    })
+  test('get key metadata', async () => {
+    const value = await cache.headAsync(testKey, { s3Options: { IfModifiedSince: 0 } })
+    expect(value).toHaveProperty(headerName, headerValue)
   })
 
-  test('get key with no TTL', done => {
-    cache.ttl(testKey, {}, (err, value) => {
-      expect(err).toBeNull()
-      expect(value).toEqual(-1)
-      done()
-    })
+  test('get key with no TTL', async () => {
+    const value = await cache.ttlAsync(testKey, {})
+    expect(value).toEqual(-1)
   })
 
-  test('delete string', done => {
+  test('delete string', async () => {
     // Force this bucket option so we test the s3Option assign code
-    cache.del(testKey, { s3Options: { Bucket: keyParams.bucket } }, done)
+    await cache.delAsync(testKey, { s3Options: { Bucket: keyParams.bucket } })
   })
 })
 
 describe('get/set/del with prefix', () => {
   const pathPrefix = random(utils.largeRandomOptions)
-  const cache = new S3Cache(Object.assign({}, keyParams, {
+  const cache = utils.getAsyncCache(Object.assign({}, keyParams, {
     pathPrefix,
   }))
 
@@ -191,14 +153,10 @@ describe('get/set/del with prefix', () => {
     utils.debugLog(JSON.stringify(cache.s3.cache))
   })
 
-  test('check a set string prefix', done => {
-    async.waterfall([
-      waterCb => cache.set(testKey, testValue, waterCb),
-      (x, waterCb) => cache.get(testKey, {}, (err, value) => {
-        expect(err).toBeNull()
-        expect(value).toEqual(testValue)
-        waterCb()
-      })
-    ], done)
+  test('check a set string prefix', async () => {
+    await cache.setAsync(testKey, testValue)
+    const value = await cache.getAsync(testKey, {})
+
+    expect(value).toEqual(testValue)
   })
 })
