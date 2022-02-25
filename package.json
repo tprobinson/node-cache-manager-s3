@@ -57,6 +57,6 @@
     "loglevel": "^1.6.3",
     "loglevel-plugin-prefix": "^0.8.4",
     "moment": "^2.24.0",
-    "url-parse": "^1.4.7"
+    "url-parse": "^1.5.7"
   }
 }
