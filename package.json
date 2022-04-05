@@ -56,7 +56,7 @@
     "checksum": "^0.1.1",
     "loglevel": "^1.6.3",
     "loglevel-plugin-prefix": "^0.8.4",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "url-parse": "^1.4.7"
   }
 }
