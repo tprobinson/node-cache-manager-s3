@@ -51,12 +51,12 @@
     ]
   },
   "dependencies": {
-    "aws-sdk": "^2.493.0",
+    "aws-sdk": "^2.814.0",
     "chalk": "^2.4.2",
     "checksum": "^0.1.1",
     "loglevel": "^1.6.3",
     "loglevel-plugin-prefix": "^0.8.4",
-    "moment": "^2.24.0",
-    "url-parse": "^1.4.7"
+    "moment": "^2.29.4",
+    "url-parse": "^1.5.9"
   }
 }
